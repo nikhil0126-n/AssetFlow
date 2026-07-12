@@ -397,6 +397,26 @@
         </div>
     </div>
 
+    <!-- QR Scanner Modal -->
+    <div id="modal-qr-scanner" class="modal-backdrop hidden">
+        <div class="modal-card" style="max-width: 450px;">
+            <div class="modal-header">
+                <h3>📷 Scan Asset QR Code</h3>
+                <button class="modal-close" id="btn-close-qr-reader">&times;</button>
+            </div>
+            <div class="modal-body" style="text-align: center;">
+                <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:12px;">Position the asset QR code in front of your camera.</p>
+                <div id="qr-reader" style="width: 100%; max-width: 380px; margin: 0 auto; background: #0b0f19; border: 2px dashed var(--border-color); border-radius: var(--radius); overflow: hidden;"></div>
+                <div id="qr-reader-results" style="margin-top: 12px; font-weight:600; color:var(--color-success);"></div>
+            </div>
+            <div class="modal-footer" style="justify-content: center;">
+                <button type="button" class="btn btn-secondary" id="btn-stop-qr">Close Scanner</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- html5-qrcode CDN Script -->
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     <!-- Application Script -->
     <script src="js/app.js"></script>
 </body>

@@ -78,6 +78,9 @@ function get_status_class($status) {
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
             <input type="text" name="search" id="asset-search" class="form-control" placeholder="Search by tag, name, serial..." value="<?php echo htmlspecialchars($search); ?>">
         </div>
+        <button type="button" class="btn btn-secondary" id="btn-scan-qr" title="Scan Asset QR Code" style="display: flex; align-items: center; justify-content: center; width: 44px; height: 38px; padding: 0; min-width: 44px; margin-right: 8px;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        </button>
         <select name="category" id="asset-filter-category" class="form-control">
             <option value="">All Categories</option>
             <?php foreach ($categories as $cat): ?>
