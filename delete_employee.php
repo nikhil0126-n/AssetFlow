@@ -1,3 +1,17 @@
+<?php
+require_once 'header.php';
+
+global $user_role, $db, $user_id;
+
+// Guard: Admin only
+if ($user_role !== 'admin') {
+    header('Location: org_setup.php');
+    exit;
+}
+
+$id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+
+if ($id > 0) {
     try {
         // Log activity before deleting to record name
         $stmtName = $db->prepare("SELECT name FROM employees WHERE id = ?");

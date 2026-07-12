@@ -211,6 +211,8 @@ $techs_list = array_keys($techs_list);
     left: 12px;
     color: var(--text-muted);
     font-size: 0.9rem;
+    pointer-events: none;
+    z-index: 2;
 }
 
 .filter-input {
@@ -225,7 +227,7 @@ $techs_list = array_keys($techs_list);
     transition: var(--transition);
 }
 
-.search-input {
+.search-input, .select-input {
     padding-left: 36px !important;
 }
 
@@ -252,9 +254,9 @@ $techs_list = array_keys($techs_list);
 }
 
 .kb-col {
-    width: 280px;
+    width: 320px;
     flex-shrink: 0;
-    background: rgba(255, 255, 255, 0.015);
+    background: rgba(15, 19, 34, 0.4);
     border: 1px solid var(--border-color);
     border-radius: var(--radius);
     padding: 16px;
@@ -329,57 +331,62 @@ $techs_list = array_keys($techs_list);
 
 .t-tag {
     font-size: 0.72rem;
-    padding: 2px 6px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid var(--border-color);
+    padding: 3px 8px;
+    background: rgba(99, 102, 241, 0.08);
+    border: 1px solid rgba(99, 102, 241, 0.15);
     border-radius: 4px;
-    color: var(--text-secondary);
+    color: var(--color-primary);
+    font-weight: 600;
 }
 
 /* Priority labels */
 .t-prio {
-    font-size: 0.65rem;
+    font-size: 0.68rem;
     font-weight: 600;
-    padding: 2px 6px;
+    padding: 2px 8px;
     border-radius: 4px;
     text-transform: uppercase;
 }
-.p-critical { background: rgba(239, 68, 68, 0.15); color: var(--color-danger); }
-.p-high { background: rgba(245, 158, 11, 0.15); color: var(--color-warning); }
-.p-medium { background: rgba(59, 130, 246, 0.15); color: var(--color-info); }
-.p-low { background: rgba(16, 185, 129, 0.15); color: var(--color-success); }
+.p-critical { background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.15); color: var(--color-danger); }
+.p-high { background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.15); color: var(--color-warning); }
+.p-medium { background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.15); color: var(--color-info); }
+.p-low { background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.15); color: var(--color-success); }
 
 .t-title {
     margin: 0;
-    font-size: 0.85rem;
+    font-size: 0.9rem;
     color: var(--text-primary);
     font-weight: 600;
 }
 
 .t-desc {
     margin: 0;
-    font-size: 0.76rem;
+    font-size: 0.8rem;
     color: var(--text-secondary);
-    line-height: 1.4;
+    line-height: 1.45;
 }
 
 .t-meta-row {
     display: flex;
     align-items: center;
-    gap: 6px;
-    font-size: 0.7rem;
+    gap: 8px;
+    font-size: 0.78rem;
     color: var(--text-muted);
 }
 
+.t-meta-value {
+    color: var(--color-primary);
+    font-weight: 600;
+}
+
 .t-notes {
-    font-size: 0.72rem;
-    font-style: italic;
-    background: rgba(255, 255, 255, 0.02);
-    border-left: 2px solid var(--color-primary);
-    padding: 4px 8px;
-    margin-top: 4px;
-    border-radius: 2px;
+    font-size: 0.75rem;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 6px;
+    padding: 8px 12px;
+    margin-top: 8px;
     color: var(--text-secondary);
+    border: 1px solid var(--border-color);
 }
 
 .t-actions {
@@ -403,6 +410,15 @@ $techs_list = array_keys($techs_list);
     text-decoration: none;
 }
 
+.t-actions .t-btn:not(.view) {
+    flex-grow: 1;
+}
+
+.t-actions .t-btn.view {
+    width: 32px;
+    flex-shrink: 0;
+}
+
 .t-btn.primary {
     background-color: var(--color-primary);
     color: white;
@@ -410,6 +426,15 @@ $techs_list = array_keys($techs_list);
 
 .t-btn.primary:hover {
     background-color: var(--color-primary-hover);
+}
+
+.t-btn.start {
+    background-color: var(--color-warning);
+    color: white;
+}
+
+.t-btn.start:hover {
+    background-color: #d97706;
 }
 
 .t-btn.resolve {
@@ -438,14 +463,28 @@ $techs_list = array_keys($techs_list);
     align-items: center;
     justify-content: center;
     text-align: center;
-    padding: 30px 10px;
+    padding: 30px 15px;
     border: 1.5px dashed var(--border-color);
     border-radius: 8px;
     color: var(--text-muted);
     gap: 8px;
+    min-height: 200px;
 }
 .kb-empty i {
-    font-size: 1.6rem;
+    font-size: 1.8rem;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--text-muted);
+    margin-bottom: 8px;
+}
+.kb-empty.success i {
+    background: rgba(16, 185, 129, 0.08);
+    color: var(--color-success);
 }
 .kb-empty h4 {
     margin: 0;
@@ -468,15 +507,55 @@ $techs_list = array_keys($techs_list);
 
 /* Light Theme overrides */
 body.light-theme .kb-col {
-    background: rgba(0, 0, 0, 0.015) !important;
-    border: 1px solid rgba(0, 0, 0, 0.06) !important;
+    background: #f8fafc !important;
+    border: 1px solid #e2e8f0 !important;
 }
 body.light-theme .t-card {
     background: #ffffff !important;
-    border: 1px solid rgba(0, 0, 0, 0.08) !important;
+    border: 1px solid #e2e8f0 !important;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.03) !important;
+}
+body.light-theme .t-card:hover {
+    border-color: var(--color-primary) !important;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.02) !important;
 }
 body.light-theme .kb-empty {
-    border: 1.5px dashed rgba(0, 0, 0, 0.08) !important;
+    border: 1.5px dashed #cbd5e1 !important;
+}
+body.light-theme .kb-empty i {
+    background: rgba(0, 0, 0, 0.03);
+    color: #64748b;
+}
+body.light-theme .kb-empty.success i {
+    background: rgba(16, 185, 129, 0.1);
+    color: var(--color-success);
+}
+body.light-theme .kb-count {
+    background: #e2e8f0 !important;
+    border-color: #cbd5e1 !important;
+    color: #475569 !important;
+}
+body.light-theme .filter-toolbar {
+    background: #ffffff !important;
+    border-color: #e2e8f0 !important;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.03) !important;
+}
+body.light-theme .filter-input {
+    background: #ffffff !important;
+    border-color: #cbd5e1 !important;
+    color: #1e293b !important;
+}
+body.light-theme .filter-input:focus {
+    border-color: var(--color-primary) !important;
+    background: #ffffff !important;
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1) !important;
+}
+body.light-theme .filter-group i {
+    color: #64748b !important;
+}
+body.light-theme .t-notes {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
 }
 </style>
 
@@ -545,6 +624,7 @@ body.light-theme .kb-empty {
             <input type="text" class="filter-input search-input" id="filter-search" placeholder="Search by asset, tag, reporter, technician or issue...">
         </div>
         <div class="filter-group">
+            <i class="bi bi-flag"></i>
             <select class="filter-input select-input" id="filter-prio">
                 <option value="">All Priorities</option>
                 <option value="Critical">Critical</option>
@@ -554,6 +634,7 @@ body.light-theme .kb-empty {
             </select>
         </div>
         <div class="filter-group">
+            <i class="bi bi-box"></i>
             <select class="filter-input select-input" id="filter-asset">
                 <option value="">All Assets</option>
                 <?php foreach($assets_list as $ast): ?>
@@ -562,11 +643,23 @@ body.light-theme .kb-empty {
             </select>
         </div>
         <div class="filter-group">
+            <i class="bi bi-person"></i>
             <select class="filter-input select-input" id="filter-tech">
                 <option value="">All Technicians</option>
                 <?php foreach($techs_list as $tech): ?>
                     <option value="<?php echo htmlspecialchars($tech); ?>"><?php echo htmlspecialchars($tech); ?></option>
                 <?php endforeach; ?>
+            </select>
+        </div>
+        <div class="filter-group">
+            <i class="bi bi-sliders"></i>
+            <select class="filter-input select-input" id="filter-status">
+                <option value="">All Statuses</option>
+                <option value="pending">Pending</option>
+                <option value="approved">Approved</option>
+                <option value="tech_assigned">Technician Assigned</option>
+                <option value="in_progress">In Progress</option>
+                <option value="resolved">Resolved</option>
             </select>
         </div>
         <button class="btn btn-secondary btn-sm" id="btn-clear-filters" style="height: 38px;">
@@ -604,7 +697,7 @@ body.light-theme .kb-empty {
                     <?php if (empty($items)): ?>
                         <div class="kb-empty <?php echo $colKey === 'resolved' ? 'success' : ''; ?>">
                             <?php if ($colKey === 'resolved'): ?>
-                                <i class="bi bi-check-circle" style="color: var(--color-success);"></i>
+                                <i class="bi bi-check-circle"></i>
                                 <h4>No tickets in this stage</h4>
                                 <p>Tickets will appear here when they move to this status.</p>
                             <?php else: ?>
@@ -625,26 +718,26 @@ body.light-theme .kb-empty {
                                 <span class="t-tag"><?php echo htmlspecialchars($req['tag']); ?></span>
                                 <span class="t-prio p-<?php echo strtolower($req['priority']); ?>"><?php echo htmlspecialchars($req['priority']); ?></span>
                             </div>
-                            
+                             
                             <h4 class="t-title"><?php echo htmlspecialchars($req['asset_name']); ?></h4>
                             <p class="t-desc"><?php echo htmlspecialchars($req['description']); ?></p>
-                            
+                             
                             <div class="t-meta-row">
-                                <i class="bi bi-person"></i> Reporter: <?php echo htmlspecialchars($req['reporter_name']); ?>
+                                <i class="bi bi-person"></i> Reporter: <span class="t-meta-value"><?php echo htmlspecialchars($req['reporter_name']); ?></span>
                             </div>
                             <?php if ($req['assigned_technician']): ?>
                             <div class="t-meta-row">
-                                <i class="bi bi-wrench"></i> Technician: <?php echo htmlspecialchars($req['assigned_technician']); ?>
+                                <i class="bi bi-wrench"></i> Technician: <span class="t-meta-value"><?php echo htmlspecialchars($req['assigned_technician']); ?></span>
                             </div>
                             <?php endif; ?>
                             <div class="t-meta-row">
-                                <i class="bi bi-calendar"></i> Created: <?php echo date('d M Y', strtotime($req['created_at'])); ?>
+                                <i class="bi bi-calendar"></i> Created: <span class="t-meta-value-date"><?php echo date('d M Y', strtotime($req['created_at'])); ?></span>
                             </div>
-                            
+                             
                             <?php if (!empty($req['notes'])): ?>
-                            <div class="t-notes">Notes: <?php echo htmlspecialchars($req['notes']); ?></div>
+                            <div class="t-notes"><strong>Notes:</strong> <?php echo htmlspecialchars($req['notes']); ?></div>
                             <?php endif; ?>
-                            
+                             
                             <div class="t-actions">
                                 <?php if ($req['status'] === 'Pending' && ($user_role === 'admin' || $user_role === 'asset_manager')): ?>
                                     <button class="t-btn primary assign btn-approve-maint" data-id="<?php echo $req['id']; ?>">Approve</button>
@@ -659,7 +752,7 @@ body.light-theme .kb-empty {
                                 
                                 <button class="t-btn view" title="View details" onclick="alert('Asset: <?php echo htmlspecialchars($req['asset_name']); ?>\nTag: <?php echo htmlspecialchars($req['tag']); ?>\nDescription: <?php echo htmlspecialchars($req['description']); ?>')"><i class="bi bi-eye"></i></button>
                             </div>
-                            
+                             
                         </div>
                         <?php endforeach; ?>
                     <?php endif; ?>
@@ -677,6 +770,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const prioFilter = document.getElementById('filter-prio');
     const assetFilter = document.getElementById('filter-asset');
     const techFilter = document.getElementById('filter-tech');
+    const statusFilter = document.getElementById('filter-status');
     const clearBtn = document.getElementById('btn-clear-filters');
     const showingText = document.getElementById('showing-text');
     
@@ -688,6 +782,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const prio = prioFilter.value;
         const asset = assetFilter.value;
         const tech = techFilter.value;
+        const status = statusFilter.value;
         
         let visibleCount = 0;
         
@@ -698,6 +793,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (prio && card.dataset.prio !== prio) match = false;
             if (asset && card.dataset.asset !== asset) match = false;
             if (tech && card.dataset.tech !== tech) match = false;
+            if (status && card.closest('.kb-col').dataset.status !== status) match = false;
             
             if (match) {
                 card.style.display = 'block';
@@ -709,8 +805,15 @@ document.addEventListener('DOMContentLoaded', () => {
         
         showingText.textContent = `Showing ${visibleCount} of ${totalCount} tickets`;
         
-        // Update column counts
+        // Update column display and count badges
         document.querySelectorAll('.kb-col').forEach(col => {
+            const colStatus = col.dataset.status;
+            if (!status || colStatus === status) {
+                col.style.display = 'flex';
+            } else {
+                col.style.display = 'none';
+            }
+            
             const visibleInCol = col.querySelectorAll('.t-card[style="display: block;"]').length;
             const badge = col.querySelector('.count-badge');
             if (badge) {
@@ -726,6 +829,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if(prioFilter) prioFilter.addEventListener('change', applyFilters);
     if(assetFilter) assetFilter.addEventListener('change', applyFilters);
     if(techFilter) techFilter.addEventListener('change', applyFilters);
+    if(statusFilter) statusFilter.addEventListener('change', applyFilters);
     
     if(clearBtn) {
         clearBtn.addEventListener('click', () => {
@@ -733,6 +837,7 @@ document.addEventListener('DOMContentLoaded', () => {
             prioFilter.value = '';
             assetFilter.value = '';
             techFilter.value = '';
+            statusFilter.value = '';
             applyFilters();
         });
     }
