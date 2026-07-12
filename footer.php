@@ -57,6 +57,10 @@
                             <input type="text" id="reg-location" required placeholder="e.g. Bangalore Office, Floor 3">
                         </div>
                     </div>
+                    <div class="form-group" style="margin-bottom:16px;">
+                        <label for="reg-photo">Photo URL / Demo Image Path</label>
+                        <input type="text" id="reg-photo" placeholder="e.g. img/macbook.jpg or any online URL">
+                    </div>
                     <div class="form-group checkbox-group">
                         <input type="checkbox" id="reg-shared">
                         <label for="reg-shared">Mark as shared bookable resource (e.g. conference room, pool car)</label>
