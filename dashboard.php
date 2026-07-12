@@ -10,6 +10,25 @@ function get_pill_class($status) {
     return $map[$status] ?? 'retired';
 }
 
+// Auto-update booking statuses based on current date & time
+$db->query("
+    UPDATE bookings 
+    SET status = 'Completed' 
+    WHERE status IN ('Upcoming', 'Ongoing') 
+    AND (
+        booking_date < CURRENT_DATE() 
+        OR (booking_date = CURRENT_DATE() AND end_time <= CURRENT_TIME())
+    )
+");
+$db->query("
+    UPDATE bookings 
+    SET status = 'Ongoing' 
+    WHERE status = 'Upcoming' 
+    AND booking_date = CURRENT_DATE() 
+    AND start_time <= CURRENT_TIME() 
+    AND end_time > CURRENT_TIME()
+");
+
 if ($user_role === 'admin' || $user_role === 'asset_manager'): 
     // ==========================================
     // ADMIN & ASSET MANAGER DASHBOARD
@@ -52,6 +71,15 @@ if ($user_role === 'admin' || $user_role === 'asset_manager'):
         FROM maintenance_requests m
         JOIN assets a ON m.asset_id = a.id
         WHERE m.status = 'Pending'
+    ")->fetchAll();
+
+    // Fetch recent system-wide activity logs
+    $recent_activity = $db->query("
+        SELECT al.*, e.name as employee_name
+        FROM activity_logs al
+        LEFT JOIN employees e ON al.employee_id = e.id
+        ORDER BY al.created_at DESC
+        LIMIT 6
     ")->fetchAll();
     ?>
 
@@ -199,6 +227,33 @@ if ($user_role === 'admin' || $user_role === 'asset_manager'):
                         }
                         ?>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Activity Feed -->
+        <div class="dashboard-panel card-glow" style="margin-top: 24px;">
+            <div class="panel-header">
+                <h3>Recent System Activity</h3>
+            </div>
+            <div class="panel-body">
+                <div class="activity-feed-list" style="display: flex; flex-direction: column; gap: 12px;">
+                    <?php if (empty($recent_activity)): ?>
+                        <div class="empty-state">No recent activity logged.</div>
+                    <?php else: ?>
+                        <?php foreach ($recent_activity as $act): ?>
+                            <div class="activity-feed-item" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+                                <div>
+                                    <strong style="color: var(--text-primary); font-size: 0.85rem;"><?php echo htmlspecialchars($act['action']); ?></strong>
+                                    <p style="color: var(--text-secondary); font-size: 0.78rem; margin: 2px 0 0 0;"><?php echo htmlspecialchars($act['details']); ?></p>
+                                </div>
+                                <div style="text-align: right;">
+                                    <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 500;">By: <?php echo htmlspecialchars($act['employee_name'] ?? 'System'); ?></span>
+                                    <p style="font-size: 0.7rem; color: var(--text-muted); margin: 2px 0 0 0;"><?php echo htmlspecialchars(substr($act['created_at'], 0, 16)); ?></p>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>

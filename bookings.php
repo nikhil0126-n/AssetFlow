@@ -1,8 +1,27 @@
 <?php
 require_once 'header.php';
 
+// Auto-update booking statuses based on current date & time
+$db->query("
+    UPDATE bookings 
+    SET status = 'Completed' 
+    WHERE status IN ('Upcoming', 'Ongoing') 
+    AND (
+        booking_date < CURRENT_DATE() 
+        OR (booking_date = CURRENT_DATE() AND end_time <= CURRENT_TIME())
+    )
+");
+$db->query("
+    UPDATE bookings 
+    SET status = 'Ongoing' 
+    WHERE status = 'Upcoming' 
+    AND booking_date = CURRENT_DATE() 
+    AND start_time <= CURRENT_TIME() 
+    AND end_time > CURRENT_TIME()
+");
+
 // Fetch bookable resources
-$resources = $db->query("SELECT * FROM assets WHERE is_shared = 1 AND status = 'Available'")->fetchAll();
+$resources = $db->query("SELECT * FROM assets WHERE is_shared = 1 AND status NOT IN ('Retired', 'Disposed')")->fetchAll();
 
 // Get selected resource
 $selected_id = isset($_GET['resource_id']) ? (int)$_GET['resource_id'] : (count($resources) > 0 ? $resources[0]['id'] : null);
@@ -78,13 +97,20 @@ if ($selected_id) {
                 <?php else: ?>
                     <div class="calendar-schedule">
                         <?php foreach ($bookings as $b): ?>
-                            <div class="schedule-row">
+                             <div class="schedule-row">
                                 <div>
                                     <span class="schedule-time">⏱ <?php echo htmlspecialchars($b['booking_date']); ?> | <?php echo htmlspecialchars(substr($b['start_time'], 0, 5)); ?> - <?php echo htmlspecialchars(substr($b['end_time'], 0, 5)); ?></span>
-                                    <div class="schedule-user" style="margin-top: 4px;">Reserved by: <strong><?php echo htmlspecialchars($b['employee_name']); ?></strong> (<?php echo htmlspecialchars($b['employee_email']); ?>)</div>
+                                    <div class="schedule-user" style="margin-top: 4px;">
+                                        Reserved by: <strong><?php echo htmlspecialchars($b['employee_name']); ?></strong> (<?php echo htmlspecialchars($b['employee_email']); ?>)
+                                        <span class="status-pill status-<?php echo $b['status'] === 'Upcoming' ? 'reserved' : ($b['status'] === 'Ongoing' ? 'maint' : 'available'); ?>" style="font-size: 0.68rem; padding: 2px 6px; margin-left: 8px;">
+                                            <?php echo htmlspecialchars($b['status']); ?>
+                                        </span>
+                                    </div>
                                 </div>
-                                <?php if ($user_role === 'admin' || $user_role === 'asset_manager' || $b['employee_id'] == $user_id): ?>
-                                    <button class="btn btn-danger btn-sm btn-cancel-booking" data-id="<?php echo $b['id']; ?>">Cancel Reservation</button>
+                                <?php if ($b['status'] === 'Upcoming' || $b['status'] === 'Ongoing'): ?>
+                                    <?php if ($user_role === 'admin' || $user_role === 'asset_manager' || $b['employee_id'] == $user_id): ?>
+                                        <button class="btn btn-danger btn-sm btn-cancel-booking" data-id="<?php echo $b['id']; ?>">Cancel Reservation</button>
+                                    <?php endif; ?>
                                 <?php endif; ?>
                             </div>
                         <?php endforeach; ?>

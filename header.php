@@ -69,7 +69,7 @@ if ($user_id) {
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <!-- Stylesheet -->
-    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/style.css?v=2.2">
 </head>
 <body class="<?php echo $theme === 'light' ? 'light-theme' : 'dark-theme'; ?>">
     <!-- Toast notifications overlay -->

@@ -397,7 +397,9 @@ try {
             ['Conference Table A', $catIds['Furniture'], 'AF-0003', 'SN-TAB-001', '2024-08-20', 1200.00, 'Good', 'Bangalore Office', 1, 'Available'],
             ['Tesla Model 3', $catIds['Vehicles'], 'AF-0004', 'SN-TESLA-889', '2024-11-05', 45000.00, 'Good', 'San Francisco Office', 1, 'Available'],
             ['Ergonomic Chair', $catIds['Furniture'], 'AF-0005', 'SN-CHR-771', '2025-03-12', 350.00, 'Damaged', 'Bangalore Office', 0, 'Under Maintenance'],
-            ['iPad Air', $catIds['Electronics'], 'AF-0006', 'SN-IPAD-332', '2025-06-01', 600.00, 'Good', 'Delhi Office', 0, 'Allocated']
+            ['iPad Air', $catIds['Electronics'], 'AF-0006', 'SN-IPAD-332', '2025-06-01', 600.00, 'Good', 'Delhi Office', 0, 'Allocated'],
+            ['Epson Projector', $catIds['Electronics'], 'AF-0007', 'SN-PROJ-3829', '2025-02-10', 800.00, 'Good', 'Bangalore Office', 1, 'Available'],
+            ['Meeting Room B', $catIds['Furniture'], 'AF-0008', 'SN-RM-B02', '2024-05-15', 0.00, 'Good', 'Mumbai Office', 1, 'Available']
         ];
         $assetIds = [];
         $stmt = $pdo->prepare("INSERT INTO assets (name, category_id, tag, serial_number, acquisition_date, acquisition_cost, condition_state, location, is_shared, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");

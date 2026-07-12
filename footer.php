@@ -78,7 +78,7 @@
     <div class="modal-backdrop hidden" id="modal-allocate-asset">
         <div class="modal-card">
             <div class="modal-header">
-                <h3>Allocate Asset</h3>
+                <h3>Allocate / Transfer Asset</h3>
                 <button class="modal-close">&times;</button>
             </div>
             <form id="form-allocate-asset">
@@ -86,36 +86,70 @@
                     <div class="form-group">
                         <label for="alloc-asset-id">Asset to Allocate</label>
                         <select id="alloc-asset-id" required>
-                            <option value="">Select Available Asset</option>
+                            <option value="">Select Asset</option>
                         </select>
                     </div>
-                    <div class="form-group">
-                        <label>Allocation Target Type</label>
-                        <div class="radio-group" style="margin-top: 6px;">
-                            <label><input type="radio" name="alloc-target" value="employee" checked> Employee</label>
-                            <label style="margin-left: 20px;"><input type="radio" name="alloc-target" value="department"> Department</label>
+
+                    <!-- Warning Conflict Banner -->
+                    <div id="alloc-conflict-banner" class="alert alert-danger hidden" style="margin-bottom: 15px; border-left: 4px solid var(--color-danger); padding: 10px 14px; font-size: 0.8rem; border-radius: 6px; font-weight: 500;"></div>
+
+                    <!-- Direct Allocation Fields -->
+                    <div id="alloc-direct-fields">
+                        <div class="form-group">
+                            <label>Allocation Target Type</label>
+                            <div class="radio-group" style="margin-top: 6px;">
+                                <label><input type="radio" name="alloc-target" value="employee" checked> Employee</label>
+                                <label style="margin-left: 20px;"><input type="radio" name="alloc-target" value="department"> Department</label>
+                            </div>
+                        </div>
+                        <div class="form-group" id="alloc-employee-group">
+                            <label for="alloc-employee-id">Allocate to Employee</label>
+                            <select id="alloc-employee-id">
+                                <option value="">Select Employee</option>
+                            </select>
+                        </div>
+                        <div class="form-group hidden" id="alloc-department-group">
+                            <label for="alloc-department-id">Allocate to Department</label>
+                            <select id="alloc-department-id">
+                                <option value="">Select Department</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="alloc-return-date">Expected Return Date (Optional)</label>
+                            <input type="date" id="alloc-return-date">
                         </div>
                     </div>
-                    <div class="form-group" id="alloc-employee-group">
-                        <label for="alloc-employee-id">Allocate to Employee</label>
-                        <select id="alloc-employee-id">
-                            <option value="">Select Employee</option>
-                        </select>
-                    </div>
-                    <div class="form-group hidden" id="alloc-department-group">
-                        <label for="alloc-department-id">Allocate to Department</label>
-                        <select id="alloc-department-id">
-                            <option value="">Select Department</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="alloc-return-date">Expected Return Date (Optional)</label>
-                        <input type="date" id="alloc-return-date">
+
+                    <!-- Transfer Form Fields -->
+                    <div id="alloc-transfer-fields" class="hidden">
+                        <div class="form-group">
+                            <label>Transfer Recipient Type</label>
+                            <div class="radio-group" style="margin-top: 6px;">
+                                <label><input type="radio" name="alloc-trans-target" value="employee" checked> Employee</label>
+                                <label style="margin-left: 20px;"><input type="radio" name="alloc-trans-target" value="department"> Department</label>
+                            </div>
+                        </div>
+                        <div class="form-group" id="alloc-trans-employee-group">
+                            <label for="alloc-trans-employee-id">Transfer to Employee</label>
+                            <select id="alloc-trans-employee-id">
+                                <option value="">Select Employee</option>
+                            </select>
+                        </div>
+                        <div class="form-group hidden" id="alloc-trans-department-group">
+                            <label for="alloc-trans-department-id">Transfer to Department</label>
+                            <select id="alloc-trans-department-id">
+                                <option value="">Select Department</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="alloc-trans-reason">Transfer Reason</label>
+                            <textarea id="alloc-trans-reason" placeholder="State reason for transfer..." style="width: 100%; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-card); color: var(--text-primary); padding: 8px; font-size: 0.82rem; height: 60px;"></textarea>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary modal-cancel">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Allocate</button>
+                    <button type="submit" class="btn btn-primary" id="alloc-submit-btn">Allocate</button>
                 </div>
             </form>
         </div>
