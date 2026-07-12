@@ -40,7 +40,7 @@ $employees = $db->query("
                 <div class="pane-header">
                     <h3>Departments</h3>
                     <?php if ($user_role === 'admin'): ?>
-                        <button class="btn btn-primary btn-sm" id="btn-add-dept">Create Department</button>
+                        <a href="create_dept.php" class="btn btn-primary btn-sm">Create Department</a>
                     <?php endif; ?>
                 </div>
                 <div class="table-responsive">
@@ -65,7 +65,7 @@ $employees = $db->query("
                                     <td><span class="status-pill <?php echo $dept['status'] === 'Active' ? 'status-available' : 'status-retired'; ?>"><?php echo $dept['status']; ?></span></td>
                                     <?php if ($user_role === 'admin'): ?>
                                         <td>
-                                            <button class="btn btn-secondary btn-sm btn-edit-dept" data-id="<?php echo $dept['id']; ?>" data-name="<?php echo htmlspecialchars($dept['name']); ?>" data-parent="<?php echo $dept['parent_id'] ?? ''; ?>" data-head="<?php echo $dept['head_id'] ?? ''; ?>" data-status="<?php echo $dept['status']; ?>">Edit</button>
+                                            <a href="edit_dept.php?id=<?php echo $dept['id']; ?>" class="btn btn-secondary btn-sm">Edit</a>
                                         </td>
                                     <?php endif; ?>
                                 </tr>
@@ -80,7 +80,7 @@ $employees = $db->query("
                 <div class="pane-header">
                     <h3>Asset Categories</h3>
                     <?php if ($user_role === 'admin'): ?>
-                        <button class="btn btn-primary btn-sm" id="btn-add-category">Create Category</button>
+                        <a href="create_category.php" class="btn btn-primary btn-sm">Create Category</a>
                     <?php endif; ?>
                 </div>
                 <div class="table-responsive">
@@ -100,10 +100,18 @@ $employees = $db->query("
                                 $fieldsStr = 'None';
                                 try {
                                     $fields = json_decode($cat['custom_fields'] ?? '[]', true);
-                                    if (!empty($fields)) {
-                                        $fieldsStr = implode(', ', array_map(function($f) {
-                                            return '<code>' . htmlspecialchars($f['name']) . ' (' . htmlspecialchars($f['type']) . ')</code>';
-                                        }, $fields));
+                                    if (is_array($fields) && !empty($fields)) {
+                                        $temp = [];
+                                        foreach ($fields as $key => $val) {
+                                            if (is_array($val) && isset($val['name'])) {
+                                                $name = $val['name'];
+                                                $type = $val['type'] ?? 'text';
+                                                $temp[] = '<code>' . htmlspecialchars($name) . ' (' . htmlspecialchars($type) . ')</code>';
+                                            } else {
+                                                $temp[] = '<code>' . htmlspecialchars($key) . '</code>';
+                                            }
+                                        }
+                                        $fieldsStr = implode(', ', $temp);
                                     }
                                 } catch (Exception $e) {}
                                 ?>
@@ -112,7 +120,7 @@ $employees = $db->query("
                                     <td><?php echo $fieldsStr; ?></td>
                                     <?php if ($user_role === 'admin'): ?>
                                         <td>
-                                            <button class="btn btn-secondary btn-sm btn-edit-cat" data-id="<?php echo $cat['id']; ?>" data-name="<?php echo htmlspecialchars($cat['name']); ?>" data-fields='<?php echo htmlspecialchars($cat['custom_fields'] ?? '[]'); ?>'>Edit</button>
+                                            <a href="edit_category.php?id=<?php echo $cat['id']; ?>" class="btn btn-secondary btn-sm">Edit</a>
                                         </td>
                                     <?php endif; ?>
                                 </tr>
@@ -151,7 +159,7 @@ $employees = $db->query("
                                     <td><span class="status-pill <?php echo $emp['status'] === 'Active' ? 'status-available' : 'status-retired'; ?>"><?php echo $emp['status']; ?></span></td>
                                     <?php if ($user_role === 'admin'): ?>
                                         <td>
-                                            <button class="btn btn-secondary btn-sm btn-promote-emp" data-id="<?php echo $emp['id']; ?>" data-name="<?php echo htmlspecialchars($emp['name']); ?>" data-role="<?php echo $emp['role']; ?>" data-dept="<?php echo $emp['department_id'] ?? ''; ?>" data-status="<?php echo $emp['status']; ?>">Promote/Edit</button>
+                                            <a href="edit_employee.php?id=<?php echo $emp['id']; ?>" class="btn btn-secondary btn-sm">Promote/Edit</a>
                                         </td>
                                     <?php endif; ?>
                                 </tr>
@@ -164,5 +172,20 @@ $employees = $db->query("
     </div>
 </section>
 
-<!-- Include Modal Structures in footer, handled by footer.php -->
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const activeTab = urlParams.get('tab');
+    if (activeTab) {
+        const tabBtn = document.querySelector(`.tab-btn[data-tab="${activeTab}"]`);
+        if (tabBtn) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
+            tabBtn.classList.add('active');
+            document.getElementById(activeTab).classList.add('active');
+        }
+    }
+});
+</script>
+
 <?php require_once 'footer.php'; ?>

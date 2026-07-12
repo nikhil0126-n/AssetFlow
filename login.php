@@ -96,7 +96,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <div class="form-group">
                     <div class="label-wrapper">
                         <label for="login-password">Password</label>
-                        <a href="#" id="forgot-password" class="text-link">Forgot?</a>
+                        <a href="forgot_password.php" id="forgot-password" class="text-link">Forgot?</a>
                     </div>
                     <input type="password" name="password" id="login-password" required placeholder="••••••••">
                 </div>
