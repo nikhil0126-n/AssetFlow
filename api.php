@@ -159,8 +159,11 @@ switch ($action) {
         echo json_encode(['success' => 'Logged out successfully']);
         break;
 
-         // 2. DASHBOARD DATA
 
+
+    // ------------------------------------------
+    // 2. DASHBOARD DATA
+    // ------------------------------------------
     case 'get_dashboard':
         require_login();
         $role = $_SESSION['role'];
@@ -257,8 +260,9 @@ switch ($action) {
         ]);
         break;
 
-            // 3. ORGANIZATION SETUP (ADMIN ONLY)
-
+    // ------------------------------------------
+    // 3. ORGANIZATION SETUP (ADMIN ONLY)
+    // ------------------------------------------
     case 'get_org_setup':
         require_role(['admin', 'asset_manager']); // Managers can view, Admin modifies
 
@@ -402,7 +406,8 @@ switch ($action) {
         echo json_encode(['success' => 'Employee promoted/updated successfully']);
         break;
 
- // 4. ASSET REGISTRATION & DIRECTORY
+    // ------------------------------------------
+    // 4. ASSET REGISTRATION & DIRECTORY
     // ------------------------------------------
     case 'get_assets':
         require_login();
@@ -569,6 +574,7 @@ switch ($action) {
         log_activity($db, $_SESSION['user_id'], 'Registered Asset', "Registered asset '$name' with tag $nextTag");
         echo json_encode(['success' => 'Asset registered successfully with tag ' . $nextTag, 'id' => $newAssetId]);
         break;
+
     // ------------------------------------------
     // 5. ALLOCATION & TRANSFER WORKFLOWS
     // ------------------------------------------
@@ -808,10 +814,23 @@ switch ($action) {
             exit;
         }
 
-        // Dept heads can only approve if it is to their department
-        if ($_SESSION['role'] === 'dept_head' && $transfer['to_department_id'] !== $_SESSION['department_id']) {
-            echo json_encode(['error' => 'Unauthorized. Department heads can only approve transfers entering their department.']);
-            exit;
+        // Dept heads can only approve if it is to their department or to staff in their department
+        if ($_SESSION['role'] === 'dept_head') {
+            $is_authorized = false;
+            if ($transfer['to_department_id'] == $_SESSION['department_id']) {
+                $is_authorized = true;
+            } else if ($transfer['to_employee_id']) {
+                $stmtEmpDept = $db->prepare("SELECT department_id FROM employees WHERE id = ?");
+                $stmtEmpDept->execute([$transfer['to_employee_id']]);
+                $emp_dept = $stmtEmpDept->fetchColumn();
+                if ($emp_dept == $_SESSION['department_id']) {
+                    $is_authorized = true;
+                }
+            }
+            if (!$is_authorized) {
+                echo json_encode(['error' => 'Unauthorized. Department heads can only approve transfers entering their department or targeting their department staff.']);
+                exit;
+            }
         }
 
         $db->beginTransaction();
@@ -1290,7 +1309,7 @@ switch ($action) {
         break;
 
     case 'close_audit_cycle':
-        require_role('admin');
+        require_role(['admin', 'asset_manager']);
         $cycle_id = (int)($data['cycle_id'] ?? 0);
 
         if (!$cycle_id) {
@@ -1355,7 +1374,8 @@ switch ($action) {
 
         echo json_encode(['success' => 'Audit cycle locked and discrepancy reports generated. Affected asset states updated.']);
         break;
-// ------------------------------------------
+
+    // ------------------------------------------
     // 9. REPORTS & ANALYTICS
     // ------------------------------------------
     case 'get_reports':

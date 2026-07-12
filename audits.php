@@ -84,7 +84,7 @@ if ($selected_id) {
                         Select Audit Cycle
                     <?php endif; ?>
                 </h3>
-                <?php if ($selected_cycle && $selected_cycle['status'] === 'Active' && $user_role === 'admin'): ?>
+                <?php if ($selected_cycle && $selected_cycle['status'] === 'Active' && ($user_role === 'admin' || $user_role === 'asset_manager')): ?>
                     <button class="btn btn-success btn-sm" onclick="closeAuditCycle(<?php echo $selected_cycle['id']; ?>)">Close & Generate Report</button>
                 <?php endif; ?>
             </div>

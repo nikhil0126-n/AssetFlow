@@ -7,7 +7,7 @@ $sqlAlloc = "SELECT a.*, c.name as category_name,
             al.id as allocation_id, al.allocation_date, al.expected_return_date
             FROM assets a
             JOIN categories c ON a.category_id = c.id
-            JOIN allocations al ON al.asset_id = a.id AND al.status = 'Active'
+            JOIN allocations al ON al.asset_id = a.id AND al.status IN ('Active', 'Overdue')
             LEFT JOIN employees e ON al.employee_id = e.id
             LEFT JOIN departments d ON al.department_id = d.id";
 
@@ -49,10 +49,12 @@ if ($user_role === 'employee') {
     $paramsTrans[] = $user_id;
     $paramsTrans[] = $user_id;
 } else if ($user_role === 'dept_head' && $user_dept) {
-    $sqlTrans .= " WHERE t.requested_by = ? OR t.from_employee_id = ? OR t.to_employee_id = ? OR t.to_department_id = ?";
+    $sqlTrans .= " WHERE t.requested_by = ? OR t.from_employee_id = ? OR t.to_employee_id = ? OR t.to_department_id = ? OR t.from_employee_id IN (SELECT id FROM employees WHERE department_id = ?) OR t.to_employee_id IN (SELECT id FROM employees WHERE department_id = ?)";
     $paramsTrans[] = $user_id;
     $paramsTrans[] = $user_id;
     $paramsTrans[] = $user_id;
+    $paramsTrans[] = $user_dept;
+    $paramsTrans[] = $user_dept;
     $paramsTrans[] = $user_dept;
 }
 

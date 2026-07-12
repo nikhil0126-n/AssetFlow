@@ -15,7 +15,7 @@ $sql = "SELECT a.*, c.name as category_name,
         e.name as holder_name, d.name as dept_holder_name
         FROM assets a
         JOIN categories c ON a.category_id = c.id
-        LEFT JOIN allocations al ON al.asset_id = a.id AND al.status = 'Active'
+        LEFT JOIN allocations al ON al.asset_id = a.id AND al.status IN ('Active', 'Overdue')
         LEFT JOIN employees e ON al.employee_id = e.id
         LEFT JOIN departments d ON al.department_id = d.id
         WHERE 1=1";
