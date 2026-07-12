@@ -2118,3 +2118,120 @@ body.light-theme .kanban-column-count {
     background: rgba(0, 0, 0, 0.05) !important;
     color: var(--text-secondary) !important;
 }
+
+/* ==============================================
+   Print Optimization Rules
+   ============================================== */
+@media print {
+    /* Hide non-printable elements completely */
+    .sidebar,
+    .header,
+    #btn-export-report,
+    .quick-actions,
+    .icon-btn,
+    .sidebar-footer,
+    #toast-container,
+    .modal-backdrop,
+    .btn,
+    button,
+    .modal-close {
+        display: none !important;
+    }
+
+    /* Reset grid / flex layouts for paper dimensions */
+    .app-container {
+        display: block !important;
+        width: 100% !important;
+        min-width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    .main-wrapper {
+        width: 100% !important;
+        min-width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: none !important;
+        display: block !important;
+    }
+
+    .app-view {
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+    }
+
+    /* Set backgrounds and text defaults suitable for paper printouts */
+    body {
+        background: #ffffff !important;
+        color: #000000 !important;
+        font-size: 11pt !important;
+    }
+
+    h1, h2, h3, h4, h5, h6 {
+        color: #000000 !important;
+    }
+
+    .text-muted, .text-secondary {
+        color: #4a5568 !important;
+    }
+
+    /* Convert cards and chart blocks to a clean printed layout style */
+    .card-glow, .chart-card {
+        box-shadow: none !important;
+        border: 1px solid #cbd5e1 !important;
+        background: #ffffff !important;
+        color: #000000 !important;
+        page-break-inside: avoid;
+        margin-bottom: 20px !important;
+        padding: 15px !important;
+        border-radius: 8px !important;
+    }
+
+    /* Adapt grid systems for vertical stacking or smaller grids on paper */
+    .charts-grid, 
+    .detail-split {
+        display: grid !important;
+        grid-template-columns: 1fr !important;
+        gap: 15px !important;
+    }
+
+    /* Adjust charts SVGs / visual elements */
+    svg {
+        max-width: 100%;
+        color: #000000 !important;
+    }
+
+    /* Tables styling for print */
+    .data-table {
+        border-collapse: collapse !important;
+        width: 100% !important;
+        color: #000000 !important;
+    }
+
+    .data-table th, 
+    .data-table td {
+        border: 1px solid #cbd5e1 !important;
+        padding: 8px !important;
+        color: #000000 !important;
+        background: #ffffff !important;
+    }
+
+    .data-table th {
+        background: #f1f5f9 !important;
+        font-weight: bold !important;
+    }
+
+    .asset-tag {
+        background: #e2e8f0 !important;
+        color: #000000 !important;
+        border: 1px solid #cbd5e1 !important;
+    }
+
+    .status-pill {
+        border: 1px solid #cbd5e1 !important;
+        background: transparent !important;
+        color: #000000 !important;
+    }
+}
