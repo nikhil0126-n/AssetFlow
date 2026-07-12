@@ -1630,6 +1630,7 @@ textarea:focus {
     text-align: center;
 }
 
+
 .auth-form .subtitle {
     color: var(--text-secondary);
     font-size: 0.85rem;
