@@ -7,19 +7,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const el = {
         toastContainer: document.getElementById('toast-container'),
 
-
+        
         // Notifications
         btnNotifications: document.getElementById('btn-notifications'),
         notifBadgeCount: document.getElementById('notif-badge-count'),
         notificationsDropdown: document.getElementById('notifications-dropdown'),
         notificationsList: document.getElementById('notifications-list'),
         btnMarkAllRead: document.getElementById('btn-mark-all-read'),
-
+        
         // Quick Action buttons
         btnQuickBooking: document.getElementById('btn-quick-booking'),
         btnQuickMaint: document.getElementById('btn-quick-maint'),
         btnQuickRegister: document.getElementById('btn-quick-register'),
-
+        
         // Modals
         modalRegisterAsset: document.getElementById('modal-register-asset'),
         modalAllocateAsset: document.getElementById('modal-allocate-asset'),
@@ -57,7 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const body = document.body;
             const sunIcon = btnThemeToggle.querySelector('.sun-icon');
             const moonIcon = btnThemeToggle.querySelector('.moon-icon');
-
+            
             if (body.classList.contains('light-theme')) {
                 body.classList.remove('light-theme');
                 body.classList.add('dark-theme');
@@ -83,7 +83,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!el.toastContainer) return;
         const toast = document.createElement('div');
         toast.className = `toast toast-${type}`;
-
+        
         let icon = 'ℹ️';
         if (type === 'success') icon = '✓';
         if (type === 'error') icon = '❌';
@@ -119,20 +119,16 @@ document.addEventListener('DOMContentLoaded', () => {
     async function apiRequest(action, method = 'GET', body = null) {
         try {
             const url = `api.php?action=${action}`;
-            const options = {
-                method
-            };
-
+            const options = { method };
+            
             if (method === 'POST') {
-                options.headers = {
-                    'Content-Type': 'application/json'
-                };
+                options.headers = { 'Content-Type': 'application/json' };
                 options.body = JSON.stringify(body);
             }
 
             const response = await fetch(url, options);
             const result = await response.json();
-
+            
             if (result.error) {
                 if (response.status === 401) {
                     window.location.href = 'login.php';
@@ -156,13 +152,13 @@ document.addEventListener('DOMContentLoaded', () => {
         el.btnNotifications.addEventListener('click', async (e) => {
             e.stopPropagation();
             el.notificationsDropdown.classList.toggle('hidden');
-
+            
             if (!el.notificationsDropdown.classList.contains('hidden')) {
                 // Fetch latest notifications
                 try {
                     const data = await apiRequest('get_logs_notifications');
                     renderNotificationsDropdown(data.notifications);
-                } catch (err) {}
+                } catch(err){}
             }
         });
 
@@ -178,7 +174,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderNotificationsDropdown(list) {
         el.notificationsList.innerHTML = '';
-
+        
         if (list.length === 0) {
             el.notificationsList.innerHTML = `<div class="empty-state">No new notifications.</div>`;
             return;
@@ -192,13 +188,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 <span class="notif-desc">${n.message}</span>
                 <span class="notif-time">⌚ ${n.created_at}</span>
             `;
-
+            
             item.addEventListener('click', async () => {
                 if (!n.is_read) {
                     try {
-                        await apiRequest('mark_notification_read', 'POST', {
-                            notification_id: n.id
-                        });
+                        await apiRequest('mark_notification_read', 'POST', { notification_id: n.id });
                         // Update UI locally
                         item.classList.remove('unread');
                         const count = parseInt(el.notifBadgeCount.textContent) - 1;
@@ -207,7 +201,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         } else {
                             el.notifBadgeCount.classList.add('hidden');
                         }
-                    } catch (e) {}
+                    } catch(e){}
                 }
             });
 
@@ -218,13 +212,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (el.btnMarkAllRead) {
         el.btnMarkAllRead.addEventListener('click', async () => {
             try {
-                await apiRequest('mark_notification_read', 'POST', {
-                    notification_id: 'all'
-                });
+                await apiRequest('mark_notification_read', 'POST', { notification_id: 'all' });
                 el.notifBadgeCount.classList.add('hidden');
                 el.notificationsList.innerHTML = `<div class="empty-state">No new notifications.</div>`;
                 showToast('All notifications dismissed.', 'info');
-            } catch (e) {}
+            } catch(e){}
         });
     }
 
@@ -236,6 +228,22 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await apiRequest(`get_asset_details&id=${assetId}`);
             const asset = data.asset;
             const active = data.active_allocation;
+
+            // Reset history tabs to Allocation History by default
+            document.querySelectorAll('.history-tab-btn').forEach(b => {
+                if (b.getAttribute('data-histtab') === 'histtab-allocations') {
+                    b.classList.add('active');
+                } else {
+                    b.classList.remove('active');
+                }
+            });
+            document.querySelectorAll('.history-pane').forEach(p => {
+                if (p.id === 'histtab-allocations') {
+                    p.classList.add('active');
+                } else {
+                    p.classList.remove('active');
+                }
+            });
 
             document.getElementById('detail-title').textContent = `${asset.name}`;
             document.getElementById('detail-tag-label').textContent = asset.tag;
@@ -270,7 +278,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 for (const [key, val] of Object.entries(customFields)) {
                     specsBody.innerHTML += `<div class="spec-item"><span class="spec-name">${key.replace('_', ' ').toUpperCase()}</span><span class="spec-val">${val}</span></div>`;
                 }
-            } catch (e) {}
+            } catch(e){}
 
             // Allocation Timeline
             const allocTimeline = document.getElementById('detail-allocations-timeline');
@@ -401,13 +409,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function getAssetStatusClass(status) {
         const map = {
-            'Available': 'available',
-            'Allocated': 'allocated',
-            'Reserved': 'reserved',
-            'Under Maintenance': 'maint',
-            'Lost': 'lost',
-            'Retired': 'retired',
-            'Disposed': 'disposed'
+            'Available': 'available', 'Allocated': 'allocated', 'Reserved': 'reserved',
+            'Under Maintenance': 'maint', 'Lost': 'lost', 'Retired': 'retired', 'Disposed': 'disposed'
         };
         return map[status] || 'retired';
     }
@@ -451,96 +454,63 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    // Bind click events to history tab buttons in details modal
+    document.querySelectorAll('.history-tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            // Remove active class from sibling buttons
+            const group = btn.closest('.history-tab-group');
+            if (group) {
+                group.querySelectorAll('.history-tab-btn').forEach(b => b.classList.remove('active'));
+            }
+            btn.classList.add('active');
+
+            // Switch panes
+            const targetId = btn.getAttribute('data-histtab');
+            const contents = btn.closest('.detail-col-history').querySelector('.history-tab-contents');
+            if (contents) {
+                contents.querySelectorAll('.history-pane').forEach(pane => {
+                    if (pane.id === targetId) {
+                        pane.classList.add('active');
+                    } else {
+                        pane.classList.remove('active');
+                    }
+                });
+            }
+        });
+    });
+
     // ------------------------------------------
     // 7. MODALS DATA POPULATORS
     // ------------------------------------------
-    window.openAllocateModal = async function(preSelectedAssetId = null) {
+    async function openAllocateModal(preSelectedAssetId = null) {
         try {
-            const assets = await apiRequest('get_assets');
-            window.allocateModalAssets = assets;
-
+            const assets = await apiRequest('get_assets&status=Available');
             const assetSelect = document.getElementById('alloc-asset-id');
-            assetSelect.innerHTML = '<option value="">Select Asset</option>';
+            assetSelect.innerHTML = '<option value="">Select Available Asset</option>';
             assets.forEach(a => {
-                if (a.is_shared == 1) return; // skip shared bookable resources
-                const label = (a.status === 'Allocated' || a.status === 'Overdue') ? `${a.tag} - ${a.name} (${a.status})` : `${a.tag} - ${a.name}`;
-                assetSelect.innerHTML += `<option value="${a.id}">${label}</option>`;
+                assetSelect.innerHTML += `<option value="${a.id}">${a.tag} - ${a.name}</option>`;
             });
             if (preSelectedAssetId) assetSelect.value = preSelectedAssetId;
 
             const org = await apiRequest('get_org_setup');
-
-            const empSelects = [
-                document.getElementById('alloc-employee-id'),
-                document.getElementById('alloc-trans-employee-id')
-            ];
-            empSelects.forEach(select => {
-                if (select) {
-                    select.innerHTML = '<option value="">Select Employee</option>';
-                    org.employees.forEach(emp => {
-                        if (emp.status === 'Active') {
-                            select.innerHTML += `<option value="${emp.id}">${emp.name} (${emp.email})</option>`;
-                        }
-                    });
+            const empSelect = document.getElementById('alloc-employee-id');
+            empSelect.innerHTML = '<option value="">Select Employee</option>';
+            org.employees.forEach(emp => {
+                if (emp.status === 'Active') {
+                    empSelect.innerHTML += `<option value="${emp.id}">${emp.name} (${emp.email})</option>`;
                 }
             });
 
-            const deptSelects = [
-                document.getElementById('alloc-department-id'),
-                document.getElementById('alloc-trans-department-id')
-            ];
-            deptSelects.forEach(select => {
-                if (select) {
-                    select.innerHTML = '<option value="">Select Department</option>';
-                    org.departments.forEach(dept => {
-                        if (dept.status === 'Active') {
-                            select.innerHTML += `<option value="${dept.id}">${dept.name}</option>`;
-                        }
-                    });
+            const deptSelect = document.getElementById('alloc-department-id');
+            deptSelect.innerHTML = '<option value="">Select Department</option>';
+            org.departments.forEach(dept => {
+                if (dept.status === 'Active') {
+                    deptSelect.innerHTML += `<option value="${dept.id}">${dept.name}</option>`;
                 }
             });
-
-            toggleAllocateModalInputs();
 
             openModal(el.modalAllocateAsset);
-        } catch (e) {}
-    }
-
-    function toggleAllocateModalInputs() {
-        const assetSelect = document.getElementById('alloc-asset-id');
-        const selectedId = assetSelect.value;
-        const conflictBanner = document.getElementById('alloc-conflict-banner');
-        const directFields = document.getElementById('alloc-direct-fields');
-        const transferFields = document.getElementById('alloc-transfer-fields');
-        const submitBtn = document.getElementById('alloc-submit-btn');
-
-        if (!selectedId) {
-            conflictBanner.classList.add('hidden');
-            directFields.classList.remove('hidden');
-            transferFields.classList.add('hidden');
-            submitBtn.textContent = 'Allocate';
-            return;
-        }
-
-        const asset = window.allocateModalAssets.find(a => a.id == selectedId);
-        if (asset && (asset.status === 'Allocated' || asset.status === 'Overdue')) {
-            const holder = asset.holder_name || asset.dept_holder_name || 'Staff Member';
-            conflictBanner.textContent = `Already Allocated to ${holder}. Direct re-allocation is blocked - submit a transfer request below.`;
-            conflictBanner.classList.remove('hidden');
-            directFields.classList.add('hidden');
-            transferFields.classList.remove('hidden');
-            submitBtn.textContent = 'Request Transfer';
-        } else {
-            conflictBanner.classList.add('hidden');
-            directFields.classList.remove('hidden');
-            transferFields.classList.add('hidden');
-            submitBtn.textContent = 'Allocate';
-        }
-    }
-
-    const assetSelectEl = document.getElementById('alloc-asset-id');
-    if (assetSelectEl) {
-        assetSelectEl.addEventListener('change', toggleAllocateModalInputs);
+        } catch(e){}
     }
 
     document.querySelectorAll('input[name="alloc-target"]').forEach(radio => {
@@ -555,26 +525,14 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    document.querySelectorAll('input[name="alloc-trans-target"]').forEach(radio => {
-        radio.addEventListener('change', () => {
-            if (radio.value === 'employee') {
-                document.getElementById('alloc-trans-employee-group').classList.remove('hidden');
-                document.getElementById('alloc-trans-department-group').classList.add('hidden');
-            } else {
-                document.getElementById('alloc-trans-employee-group').classList.add('hidden');
-                document.getElementById('alloc-trans-department-group').classList.remove('hidden');
-            }
-        });
-    });
-
-    window.openReturnModal = function(allocationId) {
+    function openReturnModal(allocationId) {
         document.getElementById('return-alloc-id').value = allocationId;
         document.getElementById('return-condition').value = 'Good';
         document.getElementById('return-notes').value = '';
         openModal(el.modalReturnAsset);
     }
 
-    window.openTransferModal = async function(preSelectedTag = '') {
+    async function openTransferModal(preSelectedTag = '') {
         document.getElementById('trans-asset-tag').value = preSelectedTag;
         try {
             const org = await apiRequest('get_org_setup');
@@ -595,22 +553,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             openModal(el.modalRequestTransfer);
-        } catch (e) {}
-    }
-
-    // Modal Action Buttons Click Event Listeners
-    const btnAllocateAssetModal = document.getElementById('btn-allocate-asset-modal');
-    if (btnAllocateAssetModal) {
-        btnAllocateAssetModal.addEventListener('click', () => {
-            window.openAllocateModal();
-        });
-    }
-
-    const btnRequestTransferModal = document.getElementById('btn-request-transfer-modal');
-    if (btnRequestTransferModal) {
-        btnRequestTransferModal.addEventListener('click', () => {
-            window.openTransferModal();
-        });
+        } catch(e){}
     }
 
     document.querySelectorAll('input[name="trans-target"]').forEach(radio => {
@@ -640,7 +583,7 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('book-end').value = '10:00';
 
             openModal(el.modalBookResource);
-        } catch (e) {}
+        } catch(e){}
     }
 
     async function openRaiseMaintModal(preSelectedAssetId = null) {
@@ -657,7 +600,7 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('maint-desc').value = '';
 
             openModal(el.modalRaiseMaint);
-        } catch (e) {}
+        } catch(e){}
     }
 
     // Attach returns on clicks (dashboard list, allocations tab)
@@ -689,14 +632,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('reg-shared').checked = false;
 
                 openModal(el.modalRegisterAsset);
-            } catch (e) {}
+            } catch(e){}
         });
     }
 
     // ------------------------------------------
     // 9. FORM SUBMIT HANDLERS
     // ------------------------------------------
-
+    
     // Register Asset
     if (el.formRegisterAsset) {
         el.formRegisterAsset.addEventListener('submit', async (e) => {
@@ -718,7 +661,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     queueToast(res.success, 'success');
                     window.location.reload();
                 }
-            } catch (err) {}
+            } catch(err){}
         });
     }
 
@@ -726,43 +669,20 @@ document.addEventListener('DOMContentLoaded', () => {
     if (el.formAllocateAsset) {
         el.formAllocateAsset.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const isTransferMode = !document.getElementById('alloc-conflict-banner').classList.contains('hidden');
-
-            if (isTransferMode) {
-                const targetType = document.querySelector('input[name="alloc-trans-target"]:checked').value;
-                const assetId = document.getElementById('alloc-asset-id').value;
-                const asset = window.allocateModalAssets.find(a => a.id == assetId);
-                const assetTag = asset ? asset.tag : '';
-
-                const body = {
-                    asset_tag: assetTag,
-                    to_employee_id: targetType === 'employee' ? document.getElementById('alloc-trans-employee-id').value : null,
-                    to_department_id: targetType === 'department' ? document.getElementById('alloc-trans-department-id').value : null,
-                    reason: document.getElementById('alloc-trans-reason').value
-                };
-                try {
-                    const res = await apiRequest('request_transfer', 'POST', body);
-                    if (res.success) {
-                        queueToast(res.success, 'success');
-                        window.location.reload();
-                    }
-                } catch (err) {}
-            } else {
-                const targetType = document.querySelector('input[name="alloc-target"]:checked').value;
-                const body = {
-                    asset_id: document.getElementById('alloc-asset-id').value,
-                    employee_id: targetType === 'employee' ? document.getElementById('alloc-employee-id').value : null,
-                    department_id: targetType === 'department' ? document.getElementById('alloc-department-id').value : null,
-                    expected_return_date: document.getElementById('alloc-return-date').value
-                };
-                try {
-                    const res = await apiRequest('allocate_asset', 'POST', body);
-                    if (res.success) {
-                        queueToast(res.success, 'success');
-                        window.location.reload();
-                    }
-                } catch (err) {}
-            }
+            const targetType = document.querySelector('input[name="alloc-target"]:checked').value;
+            const body = {
+                asset_id: document.getElementById('alloc-asset-id').value,
+                employee_id: targetType === 'employee' ? document.getElementById('alloc-employee-id').value : null,
+                department_id: targetType === 'department' ? document.getElementById('alloc-department-id').value : null,
+                expected_return_date: document.getElementById('alloc-return-date').value
+            };
+            try {
+                const res = await apiRequest('allocate_asset', 'POST', body);
+                if (res.success) {
+                    queueToast(res.success, 'success');
+                    window.location.reload();
+                }
+            } catch(err){}
         });
     }
 
@@ -781,7 +701,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     queueToast(res.success, 'success');
                     window.location.reload();
                 }
-            } catch (err) {}
+            } catch(err){}
         });
     }
 
@@ -801,7 +721,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     queueToast(res.success, 'success');
                     window.location.reload();
                 }
-            } catch (err) {}
+            } catch(err){}
         });
     }
 
@@ -821,7 +741,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     queueToast(res.success, 'success');
                     window.location.reload();
                 }
-            } catch (err) {}
+            } catch(err){}
         });
     }
 
@@ -840,7 +760,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     queueToast(res.success, 'success');
                     window.location.reload();
                 }
-            } catch (err) {}
+            } catch(err){}
         });
     }
 
@@ -860,7 +780,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     queueToast(res.success, 'success');
                     window.location.reload();
                 }
-            } catch (err) {}
+            } catch(err){}
         });
     }
 
@@ -884,7 +804,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     queueToast(res.success, 'success');
                     window.location.reload();
                 }
-            } catch (err) {}
+            } catch(err){}
         });
     }
 
@@ -908,28 +828,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function handleTransferApproval(id, decision) {
         try {
-            const res = await apiRequest('approve_transfer', 'POST', {
-                transfer_id: id,
-                decision
-            });
+            const res = await apiRequest('approve_transfer', 'POST', { transfer_id: id, decision });
             if (res.success) {
                 queueToast(res.success, 'success');
                 window.location.reload();
             }
-        } catch (e) {}
+        } catch(e){}
     }
 
     async function handleMaintenanceApproval(id, decision) {
         try {
-            const res = await apiRequest('approve_maintenance', 'POST', {
-                request_id: id,
-                decision
-            });
+            const res = await apiRequest('approve_maintenance', 'POST', { request_id: id, decision });
             if (res.success) {
                 queueToast(res.success, 'success');
                 window.location.reload();
             }
-        } catch (e) {}
+        } catch(e){}
     }
 
     // --- VIEW: ORGANIZATIONAL MASTER DATA ---
@@ -951,7 +865,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('dept-head-group').style.display = 'none';
 
                 openModal(el.modalCreateDept);
-            } catch (e) {}
+            } catch(e){}
         });
     }
 
@@ -959,7 +873,7 @@ document.addEventListener('DOMContentLoaded', () => {
         b.addEventListener('click', async () => {
             try {
                 const org = await apiRequest('get_org_setup');
-
+                
                 const parentSelect = document.getElementById('dept-parent');
                 parentSelect.innerHTML = '<option value="">None (Top Level)</option>';
                 org.departments.forEach(d => {
@@ -983,7 +897,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('dept-head-group').style.display = 'block';
 
                 openModal(el.modalCreateDept);
-            } catch (e) {}
+            } catch(e){}
         });
     });
 
@@ -1005,7 +919,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     queueToast(res.success, 'success');
                     window.location.reload();
                 }
-            } catch (err) {}
+            } catch(err){}
         });
     }
 
@@ -1025,7 +939,7 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('modal-cat-title').textContent = 'Edit Category';
             document.getElementById('cat-id-edit').value = b.getAttribute('data-id');
             document.getElementById('cat-name').value = b.getAttribute('data-name');
-
+            
             const fieldsList = document.getElementById('category-fields-list');
             fieldsList.innerHTML = '';
             const fields = JSON.parse(b.getAttribute('data-fields') || '[]');
@@ -1065,10 +979,7 @@ document.addEventListener('DOMContentLoaded', () => {
             document.querySelectorAll('.cat-attribute-row').forEach(row => {
                 const name = row.querySelector('.field-name').value;
                 const type = row.querySelector('.field-type').value;
-                if (name) customFields.push({
-                    name,
-                    type
-                });
+                if (name) customFields.push({ name, type });
             });
             const body = {
                 id,
@@ -1082,7 +993,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     queueToast(res.success, 'success');
                     window.location.reload();
                 }
-            } catch (err) {}
+            } catch(err){}
         });
     }
 
@@ -1103,7 +1014,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 promoteDeptSelect.value = b.getAttribute('data-dept');
 
                 openModal(el.modalPromoteEmployee);
-            } catch (e) {}
+            } catch(e){}
         });
     });
 
@@ -1122,7 +1033,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     queueToast(res.success, 'success');
                     window.location.reload();
                 }
-            } catch (err) {}
+            } catch(err){}
         });
     }
 
@@ -1162,14 +1073,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const allocId = b.getAttribute('data-alloc-id');
             if (!confirm('Are you sure you want to initiate return for this asset? This will alert the Asset Manager to check-in your device.')) return;
             try {
-                const res = await apiRequest('initiate_return', 'POST', {
-                    allocation_id: allocId
-                });
+                const res = await apiRequest('initiate_return', 'POST', { allocation_id: allocId });
                 if (res.success) {
                     queueToast(res.success, 'success');
                     window.location.reload();
                 }
-            } catch (e) {}
+            } catch(e){}
         });
     });
 
@@ -1179,14 +1088,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!confirm('Are you sure you want to cancel this booking?')) return;
             const bookingId = b.getAttribute('data-id');
             try {
-                const res = await apiRequest('cancel_booking', 'POST', {
-                    booking_id: bookingId
-                });
+                const res = await apiRequest('cancel_booking', 'POST', { booking_id: bookingId });
                 if (res.success) {
                     queueToast(res.success, 'success');
                     window.location.reload();
                 }
-            } catch (e) {}
+            } catch(e){}
         });
     });
 
@@ -1250,7 +1157,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('audit-end').value = endDate.toISOString().substring(0, 10);
 
                 openModal(el.modalCreateAudit);
-            } catch (e) {}
+            } catch(e){}
         });
     }
 
@@ -1260,16 +1167,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const status = b.getAttribute('data-status');
             const row = b.closest('tr');
             const notes = row.querySelector('.audit-notes-input').value;
-
+            
             try {
-                await apiRequest('update_audit_item', 'POST', {
-                    item_id: itemId,
-                    status,
-                    notes
-                });
+                await apiRequest('update_audit_item', 'POST', { item_id: itemId, status, notes });
                 queueToast('Audit item status logged.', 'success');
                 window.location.reload();
-            } catch (e) {}
+            } catch(e){}
         });
     });
 
@@ -1280,12 +1183,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const statusPill = row.querySelector('.status-pill').textContent.trim();
             if (statusPill !== 'Pending') {
                 try {
-                    await apiRequest('update_audit_item', 'POST', {
-                        item_id: itemId,
-                        status: statusPill,
-                        notes: input.value
-                    });
-                } catch (e) {}
+                    await apiRequest('update_audit_item', 'POST', { item_id: itemId, status: statusPill, notes: input.value });
+                } catch(e){}
             }
         });
     });
@@ -1293,14 +1192,12 @@ document.addEventListener('DOMContentLoaded', () => {
     window.closeAuditCycle = async function(cycleId) {
         if (!confirm('Are you sure you want to close this audit cycle? Missing assets will automatically be flagged as Lost.')) return;
         try {
-            const res = await apiRequest('close_audit_cycle', 'POST', {
-                cycle_id: cycleId
-            });
+            const res = await apiRequest('close_audit_cycle', 'POST', { cycle_id: cycleId });
             if (res.success) {
                 queueToast(res.success, 'success');
                 window.location.reload();
             }
-        } catch (e) {}
+        } catch(e){}
     };
 
     window.openBookModal = function(resourceId) {
@@ -1320,13 +1217,13 @@ document.addEventListener('DOMContentLoaded', () => {
         btnScanQr.addEventListener('click', () => {
             openModal(modalQrScanner);
             document.getElementById('qr-reader-results').textContent = '';
-
+            
             // Start scanning
             try {
                 html5QrCodeScanner = new Html5Qrcode("qr-reader");
                 const qrCodeSuccessCallback = (decodedText, decodedResult) => {
                     document.getElementById('qr-reader-results').textContent = `Scanned Tag: ${decodedText}`;
-
+                    
                     stopScanner();
                     closeModal(modalQrScanner);
                     showToast(`Scanned Asset: ${decodedText}`, 'success');
@@ -1339,17 +1236,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         window.location.href = `assets.php?search=${encodeURIComponent(decodedText)}`;
                     }
                 };
-                const config = {
-                    fps: 10,
-                    qrbox: {
-                        width: 250,
-                        height: 250
-                    }
-                };
+                const config = { fps: 10, qrbox: { width: 250, height: 250 } };
 
-                html5QrCodeScanner.start({
-                        facingMode: "environment"
-                    }, config, qrCodeSuccessCallback)
+                html5QrCodeScanner.start({ facingMode: "environment" }, config, qrCodeSuccessCallback)
                     .catch(err => {
                         console.warn("Camera start failed, testing alternative camera device", err);
                         html5QrCodeScanner.start(0, config, qrCodeSuccessCallback)
@@ -1357,7 +1246,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 document.getElementById('qr-reader-results').innerHTML = `<span style="color:var(--color-danger)">Camera unavailable or blocked.</span>`;
                             });
                     });
-            } catch (e) {
+            } catch(e) {
                 document.getElementById('qr-reader-results').textContent = "Scanner load error.";
             }
         });
@@ -1372,7 +1261,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     console.error("Error stopping scanner", err);
                     html5QrCodeScanner = null;
                 });
-            } catch (e) {
+            } catch(e) {
                 html5QrCodeScanner = null;
             }
         }
