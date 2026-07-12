@@ -569,14 +569,14 @@ body.light-theme .t-notes {
             <span class="curr">Maintenance</span>
         </div>
         <button class="btn btn-primary" id="btn-raise-maintenance-modal">
-            <i class="bi bi-plus-lg"></i> Raise Maintenance Ticket
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg> Raise Maintenance Ticket
         </button>
     </div>
 
     <!-- KPI Cards -->
     <div class="kpi-row">
         <div class="kpi-card">
-            <div class="kpi-icon kpi-c1"><i class="bi bi-clipboard2-data"></i></div>
+            <div class="kpi-icon kpi-c1"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg></div>
             <div class="kpi-content">
                 <h4 class="kpi-title">Total Tickets</h4>
                 <div class="kpi-value" id="kpi-total"><?php echo $total_tickets; ?></div>
@@ -584,7 +584,7 @@ body.light-theme .t-notes {
             </div>
         </div>
         <div class="kpi-card">
-            <div class="kpi-icon kpi-c2"><i class="bi bi-clock-history"></i></div>
+            <div class="kpi-icon kpi-c2"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg></div>
             <div class="kpi-content">
                 <h4 class="kpi-title">Pending</h4>
                 <div class="kpi-value" id="kpi-pending"><?php echo $pending_count; ?></div>
@@ -592,7 +592,7 @@ body.light-theme .t-notes {
             </div>
         </div>
         <div class="kpi-card">
-            <div class="kpi-icon kpi-c3"><i class="bi bi-wrench"></i></div>
+            <div class="kpi-icon kpi-c3"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg></div>
             <div class="kpi-content">
                 <h4 class="kpi-title">Under Repair</h4>
                 <div class="kpi-value" id="kpi-repair"><?php echo $repair_count; ?></div>
@@ -600,7 +600,7 @@ body.light-theme .t-notes {
             </div>
         </div>
         <div class="kpi-card">
-            <div class="kpi-icon kpi-c4"><i class="bi bi-check-circle"></i></div>
+            <div class="kpi-icon kpi-c4"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg></div>
             <div class="kpi-content">
                 <h4 class="kpi-title">Resolved</h4>
                 <div class="kpi-value" id="kpi-resolved"><?php echo $resolved_count; ?></div>
@@ -608,7 +608,7 @@ body.light-theme .t-notes {
             </div>
         </div>
         <div class="kpi-card">
-            <div class="kpi-icon kpi-c5"><i class="bi bi-shield-exclamation"></i></div>
+            <div class="kpi-icon kpi-c5"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg></div>
             <div class="kpi-content">
                 <h4 class="kpi-title">High Priority</h4>
                 <div class="kpi-value" id="kpi-high"><?php echo $high_priority_count; ?></div>
@@ -620,11 +620,11 @@ body.light-theme .t-notes {
     <!-- Filter Toolbar -->
     <div class="filter-toolbar">
         <div class="filter-group search-input-group">
-            <i class="bi bi-search"></i>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="filter-icon"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
             <input type="text" class="filter-input search-input" id="filter-search" placeholder="Search by asset, tag, reporter, technician or issue...">
         </div>
         <div class="filter-group">
-            <i class="bi bi-flag"></i>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="filter-icon"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"></path><line x1="4" y1="22" x2="4" y2="15"></line></svg>
             <select class="filter-input select-input" id="filter-prio">
                 <option value="">All Priorities</option>
                 <option value="Critical">Critical</option>
@@ -634,7 +634,7 @@ body.light-theme .t-notes {
             </select>
         </div>
         <div class="filter-group">
-            <i class="bi bi-box"></i>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="filter-icon"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
             <select class="filter-input select-input" id="filter-asset">
                 <option value="">All Assets</option>
                 <?php foreach($assets_list as $ast): ?>
@@ -643,7 +643,7 @@ body.light-theme .t-notes {
             </select>
         </div>
         <div class="filter-group">
-            <i class="bi bi-person"></i>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="filter-icon"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
             <select class="filter-input select-input" id="filter-tech">
                 <option value="">All Technicians</option>
                 <?php foreach($techs_list as $tech): ?>
@@ -652,7 +652,7 @@ body.light-theme .t-notes {
             </select>
         </div>
         <div class="filter-group">
-            <i class="bi bi-sliders"></i>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="filter-icon"><line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line><line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line><line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line><line x1="1" y1="14" x2="7" y2="14"></line><line x1="9" y1="8" x2="15" y2="8"></line><line x1="17" y1="16" x2="23" y2="16"></line></svg>
             <select class="filter-input select-input" id="filter-status">
                 <option value="">All Statuses</option>
                 <option value="pending">Pending</option>
@@ -663,7 +663,7 @@ body.light-theme .t-notes {
             </select>
         </div>
         <button class="btn btn-secondary btn-sm" id="btn-clear-filters" style="height: 38px;">
-            <i class="bi bi-arrow-clockwise"></i> Clear Filters
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px;"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg> Clear Filters
         </button>
     </div>
     <span class="showing-text" id="showing-text">Showing <?php echo $total_tickets; ?> of <?php echo $total_tickets; ?> tickets</span>
@@ -697,11 +697,11 @@ body.light-theme .t-notes {
                     <?php if (empty($items)): ?>
                         <div class="kb-empty <?php echo $colKey === 'resolved' ? 'success' : ''; ?>">
                             <?php if ($colKey === 'resolved'): ?>
-                                <i class="bi bi-check-circle"></i>
+                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 12px;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
                                 <h4>No tickets in this stage</h4>
                                 <p>Tickets will appear here when they move to this status.</p>
                             <?php else: ?>
-                                <i class="bi bi-inbox"></i>
+                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 12px;"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"></polyline><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path></svg>
                                 <h4>No tickets in this stage</h4>
                                 <p>Tickets will appear here when they move to this status.</p>
                             <?php endif; ?>
@@ -723,15 +723,15 @@ body.light-theme .t-notes {
                             <p class="t-desc"><?php echo htmlspecialchars($req['description']); ?></p>
                              
                             <div class="t-meta-row">
-                                <i class="bi bi-person"></i> Reporter: <span class="t-meta-value"><?php echo htmlspecialchars($req['reporter_name']); ?></span>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px; vertical-align: -2px;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg> Reporter: <span class="t-meta-value"><?php echo htmlspecialchars($req['reporter_name']); ?></span>
                             </div>
                             <?php if ($req['assigned_technician']): ?>
                             <div class="t-meta-row">
-                                <i class="bi bi-wrench"></i> Technician: <span class="t-meta-value"><?php echo htmlspecialchars($req['assigned_technician']); ?></span>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px; vertical-align: -2px;"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg> Technician: <span class="t-meta-value"><?php echo htmlspecialchars($req['assigned_technician']); ?></span>
                             </div>
                             <?php endif; ?>
                             <div class="t-meta-row">
-                                <i class="bi bi-calendar"></i> Created: <span class="t-meta-value-date"><?php echo date('d M Y', strtotime($req['created_at'])); ?></span>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px; vertical-align: -2px;"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg> Created: <span class="t-meta-value-date"><?php echo date('d M Y', strtotime($req['created_at'])); ?></span>
                             </div>
                              
                             <?php if (!empty($req['notes'])): ?>
@@ -741,7 +741,7 @@ body.light-theme .t-notes {
                             <div class="t-actions">
                                 <?php if ($req['status'] === 'Pending' && ($user_role === 'admin' || $user_role === 'asset_manager')): ?>
                                     <button class="t-btn primary assign btn-approve-maint" data-id="<?php echo $req['id']; ?>">Approve</button>
-                                    <button class="t-btn view btn-reject-maint" data-id="<?php echo $req['id']; ?>" title="Reject"><i class="bi bi-x-lg"></i></button>
+                                    <button class="t-btn view btn-reject-maint" data-id="<?php echo $req['id']; ?>" title="Reject"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
                                 <?php elseif ($req['status'] === 'Approved' && ($user_role === 'admin' || $user_role === 'asset_manager')): ?>
                                     <button class="t-btn primary assign btn-update-maint" data-id="<?php echo $req['id']; ?>" data-status="Technician Assigned" data-tech="<?php echo htmlspecialchars($req['assigned_technician'] ?? ''); ?>" data-notes="<?php echo htmlspecialchars($req['notes'] ?? ''); ?>">Assign Technician</button>
                                 <?php elseif ($req['status'] === 'Technician Assigned' && ($user_role === 'admin' || $user_role === 'asset_manager')): ?>
@@ -750,7 +750,7 @@ body.light-theme .t-notes {
                                     <button class="t-btn primary resolve btn-update-maint" data-id="<?php echo $req['id']; ?>" data-status="Resolved" data-tech="<?php echo htmlspecialchars($req['assigned_technician'] ?? ''); ?>" data-notes="<?php echo htmlspecialchars($req['notes'] ?? ''); ?>">Resolve</button>
                                 <?php endif; ?>
                                 
-                                <button class="t-btn view" title="View details" onclick="alert('Asset: <?php echo htmlspecialchars($req['asset_name']); ?>\nTag: <?php echo htmlspecialchars($req['tag']); ?>\nDescription: <?php echo htmlspecialchars($req['description']); ?>')"><i class="bi bi-eye"></i></button>
+                                <button class="t-btn view" title="View details" onclick="alert('Asset: <?php echo htmlspecialchars($req['asset_name']); ?>\nTag: <?php echo htmlspecialchars($req['tag']); ?>\nDescription: <?php echo htmlspecialchars($req['description']); ?>')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg></button>
                             </div>
                              
                         </div>
@@ -766,6 +766,18 @@ body.light-theme .t-notes {
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
+    // Add subtitle to match design
+    const screenTitle = document.getElementById('screen-title');
+    if (screenTitle) {
+        const subtitle = document.createElement('p');
+        subtitle.style.fontSize = '14px';
+        subtitle.style.color = 'var(--text-muted)';
+        subtitle.style.marginTop = '4px';
+        subtitle.style.marginBottom = '0';
+        subtitle.innerText = 'Track repair requests and asset maintenance workflow';
+        screenTitle.parentNode.insertBefore(subtitle, screenTitle.nextSibling);
+    }
+
     const searchInput = document.getElementById('filter-search');
     const prioFilter = document.getElementById('filter-prio');
     const assetFilter = document.getElementById('filter-asset');
