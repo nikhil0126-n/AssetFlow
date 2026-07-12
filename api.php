@@ -161,8 +161,7 @@ switch ($action) {
 
          // 2. DASHBOARD DATA
 
-
-             case 'get_dashboard':
+    case 'get_dashboard':
         require_login();
         $role = $_SESSION['role'];
         $emp_id = $_SESSION['user_id'];
@@ -256,5 +255,150 @@ switch ($action) {
             'maintenance_actions' => $maintenance_actions,
             'notifications' => $notifications
         ]);
+        break;
+
+            // 3. ORGANIZATION SETUP (ADMIN ONLY)
+
+    case 'get_org_setup':
+        require_role(['admin', 'asset_manager']); // Managers can view, Admin modifies
+
+        // Departments
+        $departments = $db->query("
+            SELECT d.*, e.name as head_name, p.name as parent_name 
+            FROM departments d 
+            LEFT JOIN employees e ON d.head_id = e.id
+            LEFT JOIN departments p ON d.parent_id = p.id
+        ")->fetchAll();
+
+        // Categories
+        $categories = $db->query("SELECT * FROM categories")->fetchAll();
+
+        // Employees
+        $employees = $db->query("
+            SELECT e.id, e.name, e.email, e.role, e.status, d.name as department_name, e.department_id 
+            FROM employees e 
+            LEFT JOIN departments d ON e.department_id = d.id
+        ")->fetchAll();
+
+        echo json_encode([
+            'departments' => $departments,
+            'categories' => $categories,
+            'employees' => $employees
+        ]);
+        break;
+
+    case 'add_department':
+        require_role('admin');
+        $name = trim($data['name'] ?? '');
+        $parent_id = !empty($data['parent_id']) ? (int)$data['parent_id'] : null;
+        $status = $data['status'] ?? 'Active';
+
+        if (!$name) {
+            echo json_encode(['error' => 'Department name is required']);
+            exit;
+        }
+
+        $stmt = $db->prepare("INSERT INTO departments (name, parent_id, status) VALUES (?, ?, ?)");
+        $stmt->execute([$name, $parent_id, $status]);
+        
+        log_activity($db, $_SESSION['user_id'], 'Created Department', "Created department '$name'");
+        echo json_encode(['success' => 'Department created successfully']);
+        break;
+
+    case 'edit_department':
+        require_role('admin');
+        $id = (int)($data['id'] ?? 0);
+        $name = trim($data['name'] ?? '');
+        $parent_id = !empty($data['parent_id']) ? (int)$data['parent_id'] : null;
+        $status = $data['status'] ?? 'Active';
+        $head_id = !empty($data['head_id']) ? (int)$data['head_id'] : null;
+
+        if (!$id || !$name) {
+            echo json_encode(['error' => 'ID and name are required']);
+            exit;
+        }
+
+        // Prevent self-parenting loop
+        if ($parent_id === $id) {
+            echo json_encode(['error' => 'A department cannot be its own parent.']);
+            exit;
+        }
+
+        $stmt = $db->prepare("UPDATE departments SET name = ?, parent_id = ?, status = ?, head_id = ? WHERE id = ?");
+        $stmt->execute([$name, $parent_id, $status, $head_id, $id]);
+
+        // If head_id is assigned, promote employee to dept_head automatically if currently employee
+        if ($head_id) {
+            $stmtRole = $db->prepare("SELECT role FROM employees WHERE id = ?");
+            $stmtRole->execute([$head_id]);
+            $currentRole = $stmtRole->fetchColumn();
+            if ($currentRole === 'employee') {
+                $db->prepare("UPDATE employees SET role = 'dept_head', department_id = ? WHERE id = ?")->execute([$id, $head_id]);
+            }
+        }
+
+        log_activity($db, $_SESSION['user_id'], 'Updated Department', "Updated department ID $id ($name)");
+        echo json_encode(['success' => 'Department updated successfully']);
+        break;
+
+    case 'add_category':
+        require_role('admin');
+        $name = trim($data['name'] ?? '');
+        $custom_fields = $data['custom_fields'] ?? []; // Array of attributes
+
+        if (!$name) {
+            echo json_encode(['error' => 'Category name is required']);
+            exit;
+        }
+
+        $stmt = $db->prepare("INSERT INTO categories (name, custom_fields) VALUES (?, ?)");
+        $stmt->execute([$name, json_encode($custom_fields)]);
+
+        log_activity($db, $_SESSION['user_id'], 'Created Category', "Created asset category '$name'");
+        echo json_encode(['success' => 'Category created successfully']);
+        break;
+
+    case 'edit_category':
+        require_role('admin');
+        $id = (int)($data['id'] ?? 0);
+        $name = trim($data['name'] ?? '');
+        $custom_fields = $data['custom_fields'] ?? [];
+
+        if (!$id || !$name) {
+            echo json_encode(['error' => 'Category ID and name are required']);
+            exit;
+        }
+
+        $stmt = $db->prepare("UPDATE categories SET name = ?, custom_fields = ? WHERE id = ?");
+        $stmt->execute([$name, json_encode($custom_fields), $id]);
+
+        log_activity($db, $_SESSION['user_id'], 'Updated Category', "Updated asset category ID $id ($name)");
+        echo json_encode(['success' => 'Category updated successfully']);
+        break;
+
+    case 'promote_employee':
+        require_role('admin');
+        $employee_id = (int)($data['employee_id'] ?? 0);
+        $role = $data['role'] ?? 'employee';
+        $department_id = !empty($data['department_id']) ? (int)$data['department_id'] : null;
+        $status = $data['status'] ?? 'Active';
+
+        if (!$employee_id) {
+            echo json_encode(['error' => 'Employee ID is required']);
+            exit;
+        }
+
+        $stmt = $db->prepare("UPDATE employees SET role = ?, department_id = ?, status = ? WHERE id = ?");
+        $stmt->execute([$role, $department_id, $status, $employee_id]);
+
+        // If status deactivated, notify or clean up?
+        $stmtName = $db->prepare("SELECT name FROM employees WHERE id = ?");
+        $stmtName->execute([$employee_id]);
+        $empName = $stmtName->fetchColumn();
+
+        log_activity($db, $_SESSION['user_id'], 'Employee Role Update', "Promoted/Updated role of $empName to $role");
+        create_notification($db, $employee_id, 'Role Updated', "Your role has been updated to " . ucfirst($role) . " by the Admin.", 'info');
+
+        echo json_encode(['success' => 'Employee promoted/updated successfully']);
         break;
 
