@@ -159,5 +159,102 @@ switch ($action) {
         echo json_encode(['success' => 'Logged out successfully']);
         break;
 
+         // 2. DASHBOARD DATA
 
-    }
+
+             case 'get_dashboard':
+        require_login();
+        $role = $_SESSION['role'];
+        $emp_id = $_SESSION['user_id'];
+        $dept_id = $_SESSION['department_id'];
+
+        // KPIs
+        $kpi = [];
+        $kpi['assets_available'] = $db->query("SELECT COUNT(*) FROM assets WHERE status = 'Available'")->fetchColumn();
+        $kpi['assets_allocated'] = $db->query("SELECT COUNT(*) FROM assets WHERE status = 'Allocated'")->fetchColumn();
+        $kpi['maintenance_today'] = $db->query("SELECT COUNT(*) FROM assets WHERE status = 'Under Maintenance'")->fetchColumn();
+        
+        // Active bookings
+        $kpi['active_bookings'] = $db->query("SELECT COUNT(*) FROM bookings WHERE booking_date = CURRENT_DATE() AND status != 'Cancelled'")->fetchColumn();
+        
+        // Pending transfers
+        if ($role === 'admin' || $role === 'asset_manager') {
+            $kpi['pending_transfers'] = $db->query("SELECT COUNT(*) FROM transfers WHERE status = 'Pending'")->fetchColumn();
+        } else if ($role === 'dept_head' && $dept_id) {
+            // Transfers pending approval that target this department head's department
+            $kpi['pending_transfers'] = $db->query("SELECT COUNT(*) FROM transfers WHERE status = 'Pending' AND to_department_id = " . (int)$dept_id)->fetchColumn();
+        } else {
+            $kpi['pending_transfers'] = $db->query("SELECT COUNT(*) FROM transfers WHERE status = 'Pending' AND requested_by = " . (int)$emp_id)->fetchColumn();
+        }
+
+        // Overdue returns
+        $kpi['overdue_returns'] = $db->query("SELECT COUNT(*) FROM allocations WHERE status = 'Overdue' OR (status = 'Active' AND expected_return_date < CURRENT_DATE())")->fetchColumn();
+
+        // 1. Retrieve overdue returns items
+        $overdue_items = $db->query("
+            SELECT a.tag, a.name as asset_name, e.name as holder_name, e.email as holder_email, al.expected_return_date, al.id as allocation_id 
+            FROM allocations al
+            JOIN assets a ON al.asset_id = a.id
+            LEFT JOIN employees e ON al.employee_id = e.id
+            WHERE al.status = 'Overdue' OR (al.status = 'Active' AND al.expected_return_date < CURRENT_DATE())
+            ORDER BY al.expected_return_date ASC
+        ")->fetchAll();
+
+        // 2. Pending transfers list
+        $pending_transfers = [];
+        if ($role === 'admin' || $role === 'asset_manager') {
+            $pending_transfers = $db->query("
+                SELECT t.id, a.tag, a.name as asset_name, e_from.name as from_employee, e_to.name as to_employee, d_to.name as to_department, t.request_date
+                FROM transfers t
+                JOIN assets a ON t.asset_id = a.id
+                LEFT JOIN employees e_from ON t.from_employee_id = e_from.id
+                LEFT JOIN employees e_to ON t.to_employee_id = e_to.id
+                LEFT JOIN departments d_to ON t.to_department_id = d_to.id
+                WHERE t.status = 'Pending'
+            ")->fetchAll();
+        } else if ($role === 'dept_head' && $dept_id) {
+            $pending_transfers = $db->query("
+                SELECT t.id, a.tag, a.name as asset_name, e_from.name as from_employee, e_to.name as to_employee, d_to.name as to_department, t.request_date
+                FROM transfers t
+                JOIN assets a ON t.asset_id = a.id
+                LEFT JOIN employees e_from ON t.from_employee_id = e_from.id
+                LEFT JOIN employees e_to ON t.to_employee_id = e_to.id
+                LEFT JOIN departments d_to ON t.to_department_id = d_to.id
+                WHERE t.status = 'Pending' AND (t.to_department_id = " . (int)$dept_id . " OR a.category_id IN (SELECT id FROM categories))
+            ")->fetchAll();
+        }
+
+        // 3. Pending Maintenance requests (for Managers) or User's raised tickets
+        $maintenance_actions = [];
+        if ($role === 'admin' || $role === 'asset_manager') {
+            $maintenance_actions = $db->query("
+                SELECT m.id, a.tag, a.name as asset_name, m.priority, m.description, m.created_at
+                FROM maintenance_requests m
+                JOIN assets a ON m.asset_id = a.id
+                WHERE m.status = 'Pending'
+            ")->fetchAll();
+        } else {
+            $maintenance_actions = $db->query("
+                SELECT m.id, a.tag, a.name as asset_name, m.priority, m.status, m.created_at
+                FROM maintenance_requests m
+                JOIN assets a ON m.asset_id = a.id
+                WHERE m.reported_by = " . (int)$emp_id . " AND m.status != 'Resolved'
+            ")->fetchAll();
+        }
+
+        // Recent Notifications
+        $notifications = $db->query("
+            SELECT * FROM notifications 
+            WHERE employee_id = " . (int)$emp_id . " OR employee_id IS NULL 
+            ORDER BY created_at DESC LIMIT 5
+        ")->fetchAll();
+
+        echo json_encode([
+            'kpis' => $kpi,
+            'overdue_items' => $overdue_items,
+            'pending_transfers' => $pending_transfers,
+            'maintenance_actions' => $maintenance_actions,
+            'notifications' => $notifications
+        ]);
+        break;
+
