@@ -1355,3 +1355,159 @@ switch ($action) {
 
         echo json_encode(['success' => 'Audit cycle locked and discrepancy reports generated. Affected asset states updated.']);
         break;
+// ------------------------------------------
+    // 9. REPORTS & ANALYTICS
+    // ------------------------------------------
+    case 'get_reports':
+        require_role(['admin', 'asset_manager']);
+
+        // Metric A: Asset utilization trends (allocated vs total)
+        $totalAssets = (int)$db->query("SELECT COUNT(*) FROM assets")->fetchColumn();
+        $allocatedAssets = (int)$db->query("SELECT COUNT(*) FROM assets WHERE status = 'Allocated'")->fetchColumn();
+        $underMaint = (int)$db->query("SELECT COUNT(*) FROM assets WHERE status = 'Under Maintenance'")->fetchColumn();
+        $lost = (int)$db->query("SELECT COUNT(*) FROM assets WHERE status = 'Lost'")->fetchColumn();
+        $available = (int)$db->query("SELECT COUNT(*) FROM assets WHERE status = 'Available'")->fetchColumn();
+        
+        // Metric B: Maintenance frequency by category
+        $maintFrequency = $db->query("
+            SELECT c.name as category_name, COUNT(mr.id) as request_count 
+            FROM maintenance_requests mr
+            JOIN assets a ON mr.asset_id = a.id
+            JOIN categories c ON a.category_id = c.id
+            GROUP BY c.id
+        ")->fetchAll();
+
+        // Metric C: Department-wise allocations
+        $deptAllocations = $db->query("
+            SELECT d.name as department_name, COUNT(al.id) as allocation_count 
+            FROM allocations al
+            JOIN departments d ON al.department_id = d.id OR al.employee_id IN (SELECT id FROM employees WHERE department_id = d.id)
+            WHERE al.status IN ('Active', 'Overdue')
+            GROUP BY d.id
+        ")->fetchAll();
+
+        // Metric D: Peak usage heatmap (resource booking frequencies by hour slot)
+        $bookingHeatmap = $db->query("
+            SELECT HOUR(start_time) as booking_hour, COUNT(*) as booking_count 
+            FROM bookings 
+            WHERE status != 'Cancelled'
+            GROUP BY booking_hour
+            ORDER BY booking_hour ASC
+        ")->fetchAll();
+
+        // Metric E: Nearing retirement (over 2 years since acquisition date)
+        $nearingRetirement = $db->query("
+            SELECT tag, name, acquisition_date, condition_state
+            FROM assets 
+            WHERE acquisition_date < DATE_SUB(CURRENT_DATE(), INTERVAL 2 YEAR) AND status != 'Retired' AND status != 'Disposed'
+            LIMIT 5
+        ")->fetchAll();
+
+        echo json_encode([
+            'utilization' => [
+                'total' => $totalAssets,
+                'allocated' => $allocatedAssets,
+                'under_maintenance' => $underMaint,
+                'lost' => $lost,
+                'available' => $available
+            ],
+            'maintenance_by_category' => $maintFrequency,
+            'department_allocations' => $deptAllocations,
+            'booking_heatmap' => $bookingHeatmap,
+            'nearing_retirement' => $nearingRetirement
+        ]);
+        break;
+
+    // ------------------------------------------
+    // 10. SYSTEM LOGS & NOTIFICATIONS
+    // ------------------------------------------
+    case 'get_logs_notifications':
+        require_login();
+        $emp_id = $_SESSION['user_id'];
+
+        // Get notifications
+        $stmtNotif = $db->prepare("
+            SELECT * FROM notifications 
+            WHERE employee_id = ? OR employee_id IS NULL 
+            ORDER BY created_at DESC 
+            LIMIT 30
+        ");
+        $stmtNotif->execute([$emp_id]);
+        $notifications = $stmtNotif->fetchAll();
+
+        // Get logs (Managers see all, Employees see their own activity)
+        if (in_array($_SESSION['role'], ['admin', 'asset_manager'])) {
+            $logs = $db->query("
+                SELECT l.*, e.name as employee_name, e.email as employee_email 
+                FROM activity_logs l
+                LEFT JOIN employees e ON l.employee_id = e.id
+                ORDER BY l.created_at DESC 
+                LIMIT 50
+            ")->fetchAll();
+        } else {
+            $stmtLogs = $db->prepare("
+                SELECT l.*, e.name as employee_name, e.email as employee_email 
+                FROM activity_logs l
+                LEFT JOIN employees e ON l.employee_id = e.id
+                WHERE l.employee_id = ? 
+                ORDER BY l.created_at DESC 
+                LIMIT 50
+            ");
+            $stmtLogs->execute([$emp_id]);
+            $logs = $stmtLogs->fetchAll();
+        }
+
+        echo json_encode([
+            'notifications' => $notifications,
+            'logs' => $logs
+        ]);
+        break;
+
+    case 'mark_notification_read':
+        require_login();
+        $id = (int)($data['notification_id'] ?? 0);
+        
+        if ($id) {
+            $stmt = $db->prepare("UPDATE notifications SET is_read = 1 WHERE id = ? AND (employee_id = ? OR employee_id IS NULL)");
+            $stmt->execute([$id, $_SESSION['user_id']]);
+        }
+        echo json_encode(['success' => true]);
+        break;
+
+    case 'initiate_return':
+        require_login();
+        $allocation_id = (int)($data['allocation_id'] ?? 0);
+        
+        if (!$allocation_id) {
+            echo json_encode(['error' => 'Allocation ID is required.']);
+            exit;
+        }
+        
+        // Find allocation details
+        $stmt = $db->prepare("
+            SELECT al.*, a.tag, a.name as asset_name, e.name as employee_name
+            FROM allocations al
+            JOIN assets a ON al.asset_id = a.id
+            JOIN employees e ON al.employee_id = e.id
+            WHERE al.id = ? AND al.employee_id = ?
+        ");
+        $stmt->execute([$allocation_id, $_SESSION['user_id']]);
+        $alloc = $stmt->fetch();
+        
+        if (!$alloc) {
+            echo json_encode(['error' => 'Allocation record not found or unauthorized.']);
+            exit;
+        }
+        
+        // Create notification for Asset Managers/Admins
+        create_notification($db, null, 'Return Requested', "Employee " . $alloc['employee_name'] . " requested to return asset " . $alloc['tag'] . " (" . $alloc['asset_name'] . ") to storage.", 'warning');
+        log_activity($db, $_SESSION['user_id'], 'Initiated Return', "Requested return of asset " . $alloc['tag'] . ".");
+        
+        echo json_encode(['success' => 'Return request submitted successfully. Please hand over the asset to the Asset Manager.']);
+        break;
+
+    default:
+        echo json_encode(['error' => 'Unknown API action requested']);
+        break;
+}
+?>
