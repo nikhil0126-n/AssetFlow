@@ -48,6 +48,7 @@ document.addEventListener('DOMContentLoaded', () => {
         formPromoteEmployee: document.getElementById('form-promote-employee')
     };
 
+
     // ------------------------------------------
     // 0. THEME SWITCHER CONTROLLER
     // ------------------------------------------
@@ -236,6 +237,22 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await apiRequest(`get_asset_details&id=${assetId}`);
             const asset = data.asset;
             const active = data.active_allocation;
+
+            // Reset history tabs to Allocation History by default
+            document.querySelectorAll('.history-tab-btn').forEach(b => {
+                if (b.getAttribute('data-histtab') === 'histtab-allocations') {
+                    b.classList.add('active');
+                } else {
+                    b.classList.remove('active');
+                }
+            });
+            document.querySelectorAll('.history-pane').forEach(p => {
+                if (p.id === 'histtab-allocations') {
+                    p.classList.add('active');
+                } else {
+                    p.classList.remove('active');
+                }
+            });
 
             document.getElementById('detail-title').textContent = `${asset.name}`;
             document.getElementById('detail-tag-label').textContent = asset.tag;
@@ -451,96 +468,63 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    // Bind click events to history tab buttons in details modal
+    document.querySelectorAll('.history-tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            // Remove active class from sibling buttons
+            const group = btn.closest('.history-tab-group');
+            if (group) {
+                group.querySelectorAll('.history-tab-btn').forEach(b => b.classList.remove('active'));
+            }
+            btn.classList.add('active');
+
+            // Switch panes
+            const targetId = btn.getAttribute('data-histtab');
+            const contents = btn.closest('.detail-col-history').querySelector('.history-tab-contents');
+            if (contents) {
+                contents.querySelectorAll('.history-pane').forEach(pane => {
+                    if (pane.id === targetId) {
+                        pane.classList.add('active');
+                    } else {
+                        pane.classList.remove('active');
+                    }
+                });
+            }
+        });
+    });
+
     // ------------------------------------------
     // 7. MODALS DATA POPULATORS
     // ------------------------------------------
-    window.openAllocateModal = async function(preSelectedAssetId = null) {
+    async function openAllocateModal(preSelectedAssetId = null) {
         try {
-            const assets = await apiRequest('get_assets');
-            window.allocateModalAssets = assets;
-
+            const assets = await apiRequest('get_assets&status=Available');
             const assetSelect = document.getElementById('alloc-asset-id');
-            assetSelect.innerHTML = '<option value="">Select Asset</option>';
+            assetSelect.innerHTML = '<option value="">Select Available Asset</option>';
             assets.forEach(a => {
-                if (a.is_shared == 1) return; // skip shared bookable resources
-                const label = (a.status === 'Allocated' || a.status === 'Overdue') ? `${a.tag} - ${a.name} (${a.status})` : `${a.tag} - ${a.name}`;
-                assetSelect.innerHTML += `<option value="${a.id}">${label}</option>`;
+                assetSelect.innerHTML += `<option value="${a.id}">${a.tag} - ${a.name}</option>`;
             });
             if (preSelectedAssetId) assetSelect.value = preSelectedAssetId;
 
             const org = await apiRequest('get_org_setup');
-
-            const empSelects = [
-                document.getElementById('alloc-employee-id'),
-                document.getElementById('alloc-trans-employee-id')
-            ];
-            empSelects.forEach(select => {
-                if (select) {
-                    select.innerHTML = '<option value="">Select Employee</option>';
-                    org.employees.forEach(emp => {
-                        if (emp.status === 'Active') {
-                            select.innerHTML += `<option value="${emp.id}">${emp.name} (${emp.email})</option>`;
-                        }
-                    });
+            const empSelect = document.getElementById('alloc-employee-id');
+            empSelect.innerHTML = '<option value="">Select Employee</option>';
+            org.employees.forEach(emp => {
+                if (emp.status === 'Active') {
+                    empSelect.innerHTML += `<option value="${emp.id}">${emp.name} (${emp.email})</option>`;
                 }
             });
 
-            const deptSelects = [
-                document.getElementById('alloc-department-id'),
-                document.getElementById('alloc-trans-department-id')
-            ];
-            deptSelects.forEach(select => {
-                if (select) {
-                    select.innerHTML = '<option value="">Select Department</option>';
-                    org.departments.forEach(dept => {
-                        if (dept.status === 'Active') {
-                            select.innerHTML += `<option value="${dept.id}">${dept.name}</option>`;
-                        }
-                    });
+            const deptSelect = document.getElementById('alloc-department-id');
+            deptSelect.innerHTML = '<option value="">Select Department</option>';
+            org.departments.forEach(dept => {
+                if (dept.status === 'Active') {
+                    deptSelect.innerHTML += `<option value="${dept.id}">${dept.name}</option>`;
                 }
             });
-
-            toggleAllocateModalInputs();
 
             openModal(el.modalAllocateAsset);
         } catch (e) {}
-    }
-
-    function toggleAllocateModalInputs() {
-        const assetSelect = document.getElementById('alloc-asset-id');
-        const selectedId = assetSelect.value;
-        const conflictBanner = document.getElementById('alloc-conflict-banner');
-        const directFields = document.getElementById('alloc-direct-fields');
-        const transferFields = document.getElementById('alloc-transfer-fields');
-        const submitBtn = document.getElementById('alloc-submit-btn');
-
-        if (!selectedId) {
-            conflictBanner.classList.add('hidden');
-            directFields.classList.remove('hidden');
-            transferFields.classList.add('hidden');
-            submitBtn.textContent = 'Allocate';
-            return;
-        }
-
-        const asset = window.allocateModalAssets.find(a => a.id == selectedId);
-        if (asset && (asset.status === 'Allocated' || asset.status === 'Overdue')) {
-            const holder = asset.holder_name || asset.dept_holder_name || 'Staff Member';
-            conflictBanner.textContent = `Already Allocated to ${holder}. Direct re-allocation is blocked - submit a transfer request below.`;
-            conflictBanner.classList.remove('hidden');
-            directFields.classList.add('hidden');
-            transferFields.classList.remove('hidden');
-            submitBtn.textContent = 'Request Transfer';
-        } else {
-            conflictBanner.classList.add('hidden');
-            directFields.classList.remove('hidden');
-            transferFields.classList.add('hidden');
-            submitBtn.textContent = 'Allocate';
-        }
-    }
-
-    const assetSelectEl = document.getElementById('alloc-asset-id');
-    if (assetSelectEl) {
-        assetSelectEl.addEventListener('change', toggleAllocateModalInputs);
     }
 
     document.querySelectorAll('input[name="alloc-target"]').forEach(radio => {
@@ -555,26 +539,14 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    document.querySelectorAll('input[name="alloc-trans-target"]').forEach(radio => {
-        radio.addEventListener('change', () => {
-            if (radio.value === 'employee') {
-                document.getElementById('alloc-trans-employee-group').classList.remove('hidden');
-                document.getElementById('alloc-trans-department-group').classList.add('hidden');
-            } else {
-                document.getElementById('alloc-trans-employee-group').classList.add('hidden');
-                document.getElementById('alloc-trans-department-group').classList.remove('hidden');
-            }
-        });
-    });
-
-    window.openReturnModal = function(allocationId) {
+    function openReturnModal(allocationId) {
         document.getElementById('return-alloc-id').value = allocationId;
         document.getElementById('return-condition').value = 'Good';
         document.getElementById('return-notes').value = '';
         openModal(el.modalReturnAsset);
     }
 
-    window.openTransferModal = async function(preSelectedTag = '') {
+    async function openTransferModal(preSelectedTag = '') {
         document.getElementById('trans-asset-tag').value = preSelectedTag;
         try {
             const org = await apiRequest('get_org_setup');
@@ -596,21 +568,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
             openModal(el.modalRequestTransfer);
         } catch (e) {}
-    }
-
-    // Modal Action Buttons Click Event Listeners
-    const btnAllocateAssetModal = document.getElementById('btn-allocate-asset-modal');
-    if (btnAllocateAssetModal) {
-        btnAllocateAssetModal.addEventListener('click', () => {
-            window.openAllocateModal();
-        });
-    }
-
-    const btnRequestTransferModal = document.getElementById('btn-request-transfer-modal');
-    if (btnRequestTransferModal) {
-        btnRequestTransferModal.addEventListener('click', () => {
-            window.openTransferModal();
-        });
     }
 
     document.querySelectorAll('input[name="trans-target"]').forEach(radio => {
@@ -726,43 +683,20 @@ document.addEventListener('DOMContentLoaded', () => {
     if (el.formAllocateAsset) {
         el.formAllocateAsset.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const isTransferMode = !document.getElementById('alloc-conflict-banner').classList.contains('hidden');
-
-            if (isTransferMode) {
-                const targetType = document.querySelector('input[name="alloc-trans-target"]:checked').value;
-                const assetId = document.getElementById('alloc-asset-id').value;
-                const asset = window.allocateModalAssets.find(a => a.id == assetId);
-                const assetTag = asset ? asset.tag : '';
-
-                const body = {
-                    asset_tag: assetTag,
-                    to_employee_id: targetType === 'employee' ? document.getElementById('alloc-trans-employee-id').value : null,
-                    to_department_id: targetType === 'department' ? document.getElementById('alloc-trans-department-id').value : null,
-                    reason: document.getElementById('alloc-trans-reason').value
-                };
-                try {
-                    const res = await apiRequest('request_transfer', 'POST', body);
-                    if (res.success) {
-                        queueToast(res.success, 'success');
-                        window.location.reload();
-                    }
-                } catch (err) {}
-            } else {
-                const targetType = document.querySelector('input[name="alloc-target"]:checked').value;
-                const body = {
-                    asset_id: document.getElementById('alloc-asset-id').value,
-                    employee_id: targetType === 'employee' ? document.getElementById('alloc-employee-id').value : null,
-                    department_id: targetType === 'department' ? document.getElementById('alloc-department-id').value : null,
-                    expected_return_date: document.getElementById('alloc-return-date').value
-                };
-                try {
-                    const res = await apiRequest('allocate_asset', 'POST', body);
-                    if (res.success) {
-                        queueToast(res.success, 'success');
-                        window.location.reload();
-                    }
-                } catch (err) {}
-            }
+            const targetType = document.querySelector('input[name="alloc-target"]:checked').value;
+            const body = {
+                asset_id: document.getElementById('alloc-asset-id').value,
+                employee_id: targetType === 'employee' ? document.getElementById('alloc-employee-id').value : null,
+                department_id: targetType === 'department' ? document.getElementById('alloc-department-id').value : null,
+                expected_return_date: document.getElementById('alloc-return-date').value
+            };
+            try {
+                const res = await apiRequest('allocate_asset', 'POST', body);
+                if (res.success) {
+                    queueToast(res.success, 'success');
+                    window.location.reload();
+                }
+            } catch (err) {}
         });
     }
 

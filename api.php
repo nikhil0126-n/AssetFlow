@@ -44,18 +44,6 @@ function require_role($roles) {
     }
 }
 
-// Helper to log system events
-function log_activity($db, $employee_id, $action_name, $details = '') {
-    $stmt = $db->prepare("INSERT INTO activity_logs (employee_id, action, details) VALUES (?, ?, ?)");
-    $stmt->execute([$employee_id, $action_name, $details]);
-}
-
-// Helper to create notifications
-function create_notification($db, $employee_id, $title, $message, $type = 'info') {
-    $stmt = $db->prepare("INSERT INTO notifications (employee_id, title, message, type) VALUES (?, ?, ?, ?)");
-    $stmt->execute([$employee_id, $title, $message, $type]);
-}
-
 switch ($action) {
     // ------------------------------------------
     // 1. AUTHENTICATION ENDPOINTS

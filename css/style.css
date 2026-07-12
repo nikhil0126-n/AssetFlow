@@ -726,7 +726,10 @@ textarea:focus {
 .modal-card.modal-lg {
     width: 800px;
 }
-
+#detail-footer-actions {
+    display: flex;
+    gap: 12px;
+}
 .modal-header {
     padding: 20px 24px;
     border-bottom: 1px solid var(--border-color);
@@ -1626,6 +1629,7 @@ textarea:focus {
     margin-bottom: 6px;
     text-align: center;
 }
+
 
 .auth-form .subtitle {
     color: var(--text-secondary);
