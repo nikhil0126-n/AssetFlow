@@ -402,3 +402,956 @@ switch ($action) {
         echo json_encode(['success' => 'Employee promoted/updated successfully']);
         break;
 
+ // 4. ASSET REGISTRATION & DIRECTORY
+    // ------------------------------------------
+    case 'get_assets':
+        require_login();
+        
+        // Base Query
+        $sql = "SELECT a.*, c.name as category_name, 
+                e.name as holder_name, d.name as dept_holder_name
+                FROM assets a
+                JOIN categories c ON a.category_id = c.id
+                LEFT JOIN allocations al ON al.asset_id = a.id AND al.status = 'Active'
+                LEFT JOIN employees e ON al.employee_id = e.id
+                LEFT JOIN departments d ON al.department_id = d.id
+                WHERE 1=1";
+        
+        $params = [];
+        
+        // Filters
+        $search = trim($_GET['search'] ?? '');
+        if ($search) {
+            $sql .= " AND (a.tag LIKE ? OR a.serial_number LIKE ? OR a.name LIKE ?)";
+            $params[] = "%$search%";
+            $params[] = "%$search%";
+            $params[] = "%$search%";
+        }
+
+        $category = $_GET['category'] ?? '';
+        if ($category) {
+            $sql .= " AND a.category_id = ?";
+            $params[] = (int)$category;
+        }
+
+        $status = $_GET['status'] ?? '';
+        if ($status) {
+            $sql .= " AND a.status = ?";
+            $params[] = $status;
+        }
+
+        $location = $_GET['location'] ?? '';
+        if ($location) {
+            $sql .= " AND a.location = ?";
+            $params[] = $location;
+        }
+
+        $bookable = $_GET['bookable'] ?? '';
+        if ($bookable !== '') {
+            $sql .= " AND a.is_shared = ?";
+            $params[] = (int)$bookable;
+        }
+
+        $stmt = $db->prepare($sql);
+        $stmt->execute($params);
+        $assets = $stmt->fetchAll();
+
+        echo json_encode($assets);
+        break;
+
+    case 'get_asset_details':
+        require_login();
+        $id = (int)($_GET['id'] ?? 0);
+
+        if (!$id) {
+            echo json_encode(['error' => 'Asset ID required']);
+            exit;
+        }
+
+        // General asset details
+        $stmt = $db->prepare("
+            SELECT a.*, c.name as category_name, c.custom_fields as category_fields
+            FROM assets a
+            JOIN categories c ON a.category_id = c.id
+            WHERE a.id = ?
+        ");
+        $stmt->execute([$id]);
+        $asset = $stmt->fetch();
+
+        if (!$asset) {
+            echo json_encode(['error' => 'Asset not found']);
+            exit;
+        }
+
+        // Current active allocation
+        $stmt = $db->prepare("
+            SELECT al.*, e.name as employee_name, e.email as employee_email, d.name as department_name 
+            FROM allocations al
+            LEFT JOIN employees e ON al.employee_id = e.id
+            LEFT JOIN departments d ON al.department_id = d.id
+            WHERE al.asset_id = ? AND al.status IN ('Active', 'Overdue')
+        ");
+        $stmt->execute([$id]);
+        $active_allocation = $stmt->fetch();
+
+        // History: Allocations & returns
+        $stmt = $db->prepare("
+            SELECT al.*, e.name as employee_name, d.name as department_name, ab.name as allocator_name 
+            FROM allocations al
+            LEFT JOIN employees e ON al.employee_id = e.id
+            LEFT JOIN departments d ON al.department_id = d.id
+            LEFT JOIN employees ab ON al.allocated_by = ab.id
+            WHERE al.asset_id = ?
+            ORDER BY al.allocation_date DESC
+        ");
+        $stmt->execute([$id]);
+        $allocation_history = $stmt->fetchAll();
+
+        // History: Maintenance Logs
+        $stmt = $db->prepare("
+            SELECT mr.*, e.name as reporter_name 
+            FROM maintenance_requests mr
+            LEFT JOIN employees e ON mr.reported_by = e.id
+            WHERE mr.asset_id = ?
+            ORDER BY mr.created_at DESC
+        ");
+        $stmt->execute([$id]);
+        $maintenance_history = $stmt->fetchAll();
+
+        echo json_encode([
+            'asset' => $asset,
+            'active_allocation' => $active_allocation,
+            'allocation_history' => $allocation_history,
+            'maintenance_history' => $maintenance_history
+        ]);
+        break;
+
+    case 'register_asset':
+        require_role(['admin', 'asset_manager']);
+        $name = trim($data['name'] ?? '');
+        $category_id = (int)($data['category_id'] ?? 0);
+        $serial_number = trim($data['serial_number'] ?? '');
+        $acquisition_date = $data['acquisition_date'] ?? date('Y-m-d');
+        $acquisition_cost = (float)($data['acquisition_cost'] ?? 0.0);
+        $condition_state = $data['condition_state'] ?? 'Good';
+        $location = trim($data['location'] ?? '');
+        $is_shared = !empty($data['is_shared']) ? 1 : 0;
+
+        if (!$name || !$category_id || !$serial_number || !$location) {
+            echo json_encode(['error' => 'Name, category, serial number and location are required.']);
+            exit;
+        }
+
+        // Verify serial number unique
+        $stmt = $db->prepare("SELECT COUNT(*) FROM assets WHERE serial_number = ?");
+        $stmt->execute([$serial_number]);
+        if ($stmt->fetchColumn() > 0) {
+            echo json_encode(['error' => 'An asset with this serial number already exists.']);
+            exit;
+        }
+
+        // Auto-generate unique asset tag: Query highest ID + 1
+        $maxId = (int)$db->query("SELECT MAX(id) FROM assets")->fetchColumn();
+        $nextTag = sprintf("AF-%04d", $maxId + 1);
+
+        $photo = trim($data['photo'] ?? '');
+        if ($photo === '') {
+            $photo = null;
+        }
+
+        $stmt = $db->prepare("
+            INSERT INTO assets (name, category_id, tag, serial_number, acquisition_date, acquisition_cost, condition_state, location, is_shared, status, photo) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Available', ?)
+        ");
+        $stmt->execute([$name, $category_id, $nextTag, $serial_number, $acquisition_date, $acquisition_cost, $condition_state, $location, $is_shared, $photo]);
+        $newAssetId = $db->lastInsertId();
+
+        log_activity($db, $_SESSION['user_id'], 'Registered Asset', "Registered asset '$name' with tag $nextTag");
+        echo json_encode(['success' => 'Asset registered successfully with tag ' . $nextTag, 'id' => $newAssetId]);
+        break;
+    // ------------------------------------------
+    // 5. ALLOCATION & TRANSFER WORKFLOWS
+    // ------------------------------------------
+    case 'allocate_asset':
+        require_role(['admin', 'asset_manager']);
+        $asset_id = (int)($data['asset_id'] ?? 0);
+        $employee_id = !empty($data['employee_id']) ? (int)$data['employee_id'] : null;
+        $department_id = !empty($data['department_id']) ? (int)$data['department_id'] : null;
+        $expected_return_date = !empty($data['expected_return_date']) ? $data['expected_return_date'] : null;
+
+        if (!$asset_id) {
+            echo json_encode(['error' => 'Asset selection is required.']);
+            exit;
+        }
+        if (!$employee_id && !$department_id) {
+            echo json_encode(['error' => 'Must allocate to either an employee or a department.']);
+            exit;
+        }
+
+        // Conflict check: Is asset currently available?
+        $stmt = $db->prepare("SELECT * FROM assets WHERE id = ?");
+        $stmt->execute([$asset_id]);
+        $asset = $stmt->fetch();
+
+        if (!$asset) {
+            echo json_encode(['error' => 'Asset does not exist.']);
+            exit;
+        }
+
+        if ($asset['status'] !== 'Available') {
+            // Find who holds it currently
+            $stmtHold = $db->prepare("
+                SELECT e.name as holder_name, e.email as holder_email 
+                FROM allocations al 
+                JOIN employees e ON al.employee_id = e.id 
+                WHERE al.asset_id = ? AND al.status IN ('Active', 'Overdue')
+            ");
+            $stmtHold->execute([$asset_id]);
+            $holder = $stmtHold->fetch();
+            
+            $holder_name = $holder ? $holder['holder_name'] : 'another department/worker';
+            $holder_email = $holder ? $holder['holder_email'] : '';
+
+            echo json_encode([
+                'error' => "Asset is currently {$asset['status']} (held by $holder_name).",
+                'held_by' => $holder_name,
+                'held_by_email' => $holder_email,
+                'can_transfer' => ($asset['status'] === 'Allocated')
+            ]);
+            exit;
+        }
+
+        // Perform allocation
+        $db->beginTransaction();
+        
+        // Insert allocation record
+        $stmtAlloc = $db->prepare("
+            INSERT INTO allocations (asset_id, employee_id, department_id, allocated_by, expected_return_date, status) 
+            VALUES (?, ?, ?, ?, ?, 'Active')
+        ");
+        $stmtAlloc->execute([$asset_id, $employee_id, $department_id, $_SESSION['user_id'], $expected_return_date]);
+
+        // Update Asset state to 'Allocated'
+        $db->prepare("UPDATE assets SET status = 'Allocated' WHERE id = ?")->execute([$asset_id]);
+
+        $db->commit();
+
+        $allocated_to = '';
+        if ($employee_id) {
+            $stmtEmp = $db->prepare("SELECT name FROM employees WHERE id = ?");
+            $stmtEmp->execute([$employee_id]);
+            $allocated_to = $stmtEmp->fetchColumn();
+            create_notification($db, $employee_id, 'Asset Allocated', "Asset {$asset['name']} ({$asset['tag']}) has been allocated to you.", 'info');
+        } else {
+            $stmtDept = $db->prepare("SELECT name FROM departments WHERE id = ?");
+            $stmtDept->execute([$department_id]);
+            $allocated_to = "Department: " . $stmtDept->fetchColumn();
+        }
+
+        log_activity($db, $_SESSION['user_id'], 'Allocated Asset', "Allocated {$asset['tag']} to $allocated_to");
+        echo json_encode(['success' => 'Asset allocated successfully.']);
+        break;
+
+    case 'return_asset':
+        require_role(['admin', 'asset_manager']);
+        $allocation_id = (int)($data['allocation_id'] ?? 0);
+        $condition_on_return = trim($data['condition_on_return'] ?? 'Good');
+        $notes = trim($data['notes'] ?? '');
+
+        if (!$allocation_id) {
+            echo json_encode(['error' => 'Allocation record required.']);
+            exit;
+        }
+
+        // Get details
+        $stmt = $db->prepare("SELECT * FROM allocations WHERE id = ? AND status IN ('Active', 'Overdue')");
+        $stmt->execute([$allocation_id]);
+        $alloc = $stmt->fetch();
+
+        if (!$alloc) {
+            echo json_encode(['error' => 'Active allocation record not found.']);
+            exit;
+        }
+
+        $db->beginTransaction();
+
+        // Update allocation return fields
+        $stmtRet = $db->prepare("
+            UPDATE allocations 
+            SET actual_return_date = CURRENT_TIMESTAMP, condition_on_return = ?, status = 'Returned' 
+            WHERE id = ?
+        ");
+        $stmtRet->execute([$condition_on_return, $allocation_id]);
+
+        // Update asset back to Available and its condition
+        $db->prepare("UPDATE assets SET status = 'Available', condition_state = ? WHERE id = ?")
+           ->execute([$condition_on_return, $alloc['asset_id']]);
+
+        // Save check-in notes inside activity logs
+        $stmtTag = $db->prepare("SELECT tag, name FROM assets WHERE id = ?");
+        $stmtTag->execute([$alloc['asset_id']]);
+        $asset = $stmtTag->fetch();
+
+        log_activity($db, $_SESSION['user_id'], 'Asset Returned', "Asset {$asset['tag']} returned. Check-in Notes: $notes. Condition: $condition_on_return");
+
+        $db->commit();
+
+        echo json_encode(['success' => 'Asset marked as returned successfully. Status reset to Available.']);
+        break;
+
+    case 'request_transfer':
+        require_login();
+        $asset_tag = trim($data['asset_tag'] ?? '');
+        $to_employee_id = !empty($data['to_employee_id']) ? (int)$data['to_employee_id'] : null;
+        $to_department_id = !empty($data['to_department_id']) ? (int)$data['to_department_id'] : null;
+
+        if (!$asset_tag) {
+            echo json_encode(['error' => 'Asset tag is required.']);
+            exit;
+        }
+        if (!$to_employee_id && !$to_department_id) {
+            echo json_encode(['error' => 'Select a target employee or department for the transfer.']);
+            exit;
+        }
+
+        // Get asset details
+        $stmt = $db->prepare("SELECT * FROM assets WHERE tag = ?");
+        $stmt->execute([$asset_tag]);
+        $asset = $stmt->fetch();
+
+        if (!$asset) {
+            echo json_encode(['error' => 'Asset with this tag not found.']);
+            exit;
+        }
+
+        // Check if allocated
+        $stmtAlloc = $db->prepare("SELECT * FROM allocations WHERE asset_id = ? AND status IN ('Active', 'Overdue')");
+        $stmtAlloc->execute([$asset['id']]);
+        $alloc = $stmtAlloc->fetch();
+
+        if (!$alloc) {
+            echo json_encode(['error' => 'This asset is not currently allocated, you can allocate it directly.']);
+            exit;
+        }
+
+        // Raise transfer request
+        $stmtTrans = $db->prepare("
+            INSERT INTO transfers (asset_id, from_employee_id, to_employee_id, to_department_id, requested_by, status) 
+            VALUES (?, ?, ?, ?, ?, 'Pending')
+        ");
+        $stmtTrans->execute([
+            $asset['id'],
+            $alloc['employee_id'],
+            $to_employee_id,
+            $to_department_id,
+            $_SESSION['user_id']
+        ]);
+        $transfer_id = $db->lastInsertId();
+
+        log_activity($db, $_SESSION['user_id'], 'Requested Transfer', "Requested transfer for asset {$asset['tag']}");
+        
+        // Notify managers and the target recipient department head / employee
+        if ($to_employee_id) {
+            create_notification($db, $to_employee_id, 'Transfer Requested', "A transfer request for asset {$asset['tag']} has been raised targeting you.", 'info');
+        }
+
+        echo json_encode(['success' => 'Transfer request submitted successfully. Waiting for approval.']);
+        break;
+
+    case 'get_transfers':
+        require_login();
+        $role = $_SESSION['role'];
+        $emp_id = $_SESSION['user_id'];
+        $dept_id = $_SESSION['department_id'];
+
+        $sql = "SELECT t.*, a.tag, a.name as asset_name, 
+                e_from.name as from_employee_name, 
+                e_to.name as to_employee_name,
+                d_to.name as to_department_name,
+                req.name as requester_name
+                FROM transfers t
+                JOIN assets a ON t.asset_id = a.id
+                LEFT JOIN employees e_from ON t.from_employee_id = e_from.id
+                LEFT JOIN employees e_to ON t.to_employee_id = e_to.id
+                LEFT JOIN departments d_to ON t.to_department_id = d_to.id
+                JOIN employees req ON t.requested_by = req.id";
+        
+        if ($role === 'employee') {
+            $sql .= " WHERE t.requested_by = $emp_id OR t.from_employee_id = $emp_id OR t.to_employee_id = $emp_id";
+        } else if ($role === 'dept_head' && $dept_id) {
+            $sql .= " WHERE t.requested_by = $emp_id OR t.from_employee_id = $emp_id OR t.to_employee_id = $emp_id OR t.to_department_id = $dept_id";
+        }
+        
+        $sql .= " ORDER BY t.request_date DESC";
+        $transfers = $db->query($sql)->fetchAll();
+
+        echo json_encode($transfers);
+        break;
+
+    case 'approve_transfer':
+        require_role(['admin', 'asset_manager', 'dept_head']);
+        $transfer_id = (int)($data['transfer_id'] ?? 0);
+        $decision = $data['decision'] ?? ''; // 'Approved' or 'Rejected'
+
+        if (!$transfer_id || !in_array($decision, ['Approved', 'Rejected'])) {
+            echo json_encode(['error' => 'Valid transfer ID and decision (Approved/Rejected) are required.']);
+            exit;
+        }
+
+        // Fetch transfer record
+        $stmt = $db->prepare("SELECT * FROM transfers WHERE id = ? AND status = 'Pending'");
+        $stmt->execute([$transfer_id]);
+        $transfer = $stmt->fetch();
+
+        if (!$transfer) {
+            echo json_encode(['error' => 'Pending transfer request not found.']);
+            exit;
+        }
+
+        // Dept heads can only approve if it is to their department
+        if ($_SESSION['role'] === 'dept_head' && $transfer['to_department_id'] !== $_SESSION['department_id']) {
+            echo json_encode(['error' => 'Unauthorized. Department heads can only approve transfers entering their department.']);
+            exit;
+        }
+
+        $db->beginTransaction();
+
+        if ($decision === 'Approved') {
+            // Close the old active allocation for this asset
+            $db->prepare("
+                UPDATE allocations 
+                SET actual_return_date = CURRENT_TIMESTAMP, status = 'Returned', condition_on_return = 'Transferred' 
+                WHERE asset_id = ? AND status IN ('Active', 'Overdue')
+            ")->execute([$transfer['asset_id']]);
+
+            // Create a new allocation record
+            $stmtNewAlloc = $db->prepare("
+                INSERT INTO allocations (asset_id, employee_id, department_id, allocated_by, status) 
+                VALUES (?, ?, ?, ?, 'Active')
+            ");
+            $stmtNewAlloc->execute([
+                $transfer['asset_id'],
+                $transfer['to_employee_id'],
+                $transfer['to_department_id'],
+                $_SESSION['user_id']
+            ]);
+
+            // Update transfer record
+            $stmtUp = $db->prepare("UPDATE transfers SET status = 'Approved', approved_by = ?, approval_date = CURRENT_TIMESTAMP WHERE id = ?");
+            $stmtUp->execute([$_SESSION['user_id'], $transfer_id]);
+
+            // Log activity
+            $stmtTag = $db->prepare("SELECT tag, name FROM assets WHERE id = ?");
+            $stmtTag->execute([$transfer['asset_id']]);
+            $asset = $stmtTag->fetch();
+
+            log_activity($db, $_SESSION['user_id'], 'Approved Asset Transfer', "Approved transfer for {$asset['tag']} to target recipient.");
+            
+            // Notify target recipient
+            if ($transfer['to_employee_id']) {
+                create_notification($db, $transfer['to_employee_id'], 'Transfer Approved', "The transfer of asset {$asset['name']} ({$asset['tag']}) to you was approved.", 'success');
+            }
+        } else {
+            // Reject transfer request
+            $stmtUp = $db->prepare("UPDATE transfers SET status = 'Rejected', approved_by = ?, approval_date = CURRENT_TIMESTAMP WHERE id = ?");
+            $stmtUp->execute([$_SESSION['user_id'], $transfer_id]);
+            log_activity($db, $_SESSION['user_id'], 'Rejected Asset Transfer', "Rejected transfer request ID $transfer_id");
+        }
+
+        $db->commit();
+
+        echo json_encode(['success' => "Transfer request successfully " . strtolower($decision)]);
+        break;
+
+    // ------------------------------------------
+    // 6. RESOURCE BOOKINGS
+    // ------------------------------------------
+    case 'get_bookings':
+        require_login();
+        $asset_id = (int)($_GET['asset_id'] ?? 0);
+
+        if (!$asset_id) {
+            echo json_encode(['error' => 'Asset ID required for bookings calendar.']);
+            exit;
+        }
+
+        $stmt = $db->prepare("
+            SELECT b.*, e.name as employee_name, e.email as employee_email 
+            FROM bookings b
+            JOIN employees e ON b.employee_id = e.id
+            WHERE b.asset_id = ? AND b.status != 'Cancelled'
+            ORDER BY b.booking_date ASC, b.start_time ASC
+        ");
+        $stmt->execute([$asset_id]);
+        $bookings = $stmt->fetchAll();
+
+        echo json_encode($bookings);
+        break;
+
+    case 'book_resource':
+        require_login();
+        $asset_id = (int)($data['asset_id'] ?? 0);
+        $booking_date = $data['booking_date'] ?? '';
+        $start_time = $data['start_time'] ?? '';
+        $end_time = $data['end_time'] ?? '';
+
+        if (!$asset_id || !$booking_date || !$start_time || !$end_time) {
+            echo json_encode(['error' => 'All fields (asset, date, start time, end time) are required.']);
+            exit;
+        }
+
+        // Verify bookable
+        $stmtAsset = $db->prepare("SELECT * FROM assets WHERE id = ?");
+        $stmtAsset->execute([$asset_id]);
+        $asset = $stmtAsset->fetch();
+
+        if (!$asset) {
+            echo json_encode(['error' => 'Asset not found.']);
+            exit;
+        }
+
+        if (!$asset['is_shared']) {
+            echo json_encode(['error' => 'This asset is not marked as a shared bookable resource.']);
+            exit;
+        }
+
+        // Overlap Validation query
+        // Checks if another booking exists on the same asset, same date, not cancelled, where times overlap:
+        // (start_time < target_end AND end_time > target_start)
+        $stmtCheck = $db->prepare("
+            SELECT b.*, e.name as booker_name 
+            FROM bookings b
+            JOIN employees e ON b.employee_id = e.id
+            WHERE b.asset_id = ? 
+            AND b.booking_date = ? 
+            AND b.status != 'Cancelled' 
+            AND b.start_time < ? 
+            AND b.end_time > ?
+        ");
+        $stmtCheck->execute([$asset_id, $booking_date, $end_time, $start_time]);
+        $conflict = $stmtCheck->fetch();
+
+        if ($conflict) {
+            echo json_encode([
+                'error' => "Overlap conflict! This resource is already booked by {$conflict['booker_name']} from " . substr($conflict['start_time'], 0, 5) . " to " . substr($conflict['end_time'], 0, 5) . " on this date."
+            ]);
+            exit;
+        }
+
+        // Insert booking
+        $stmtBook = $db->prepare("
+            INSERT INTO bookings (asset_id, employee_id, booking_date, start_time, end_time, status) 
+            VALUES (?, ?, ?, ?, ?, 'Upcoming')
+        ");
+        $stmtBook->execute([$asset_id, $_SESSION['user_id'], $booking_date, $start_time, $end_time]);
+
+        log_activity($db, $_SESSION['user_id'], 'Booked Shared Resource', "Booked {$asset['tag']} ({$asset['name']}) on $booking_date from $start_time to $end_time");
+        
+        echo json_encode(['success' => 'Resource booked successfully!']);
+        break;
+
+    case 'cancel_booking':
+        require_login();
+        $booking_id = (int)($data['booking_id'] ?? 0);
+
+        if (!$booking_id) {
+            echo json_encode(['error' => 'Booking ID required.']);
+            exit;
+        }
+
+        $stmt = $db->prepare("SELECT * FROM bookings WHERE id = ?");
+        $stmt->execute([$booking_id]);
+        $booking = $stmt->fetch();
+
+        if (!$booking) {
+            echo json_encode(['error' => 'Booking record not found.']);
+            exit;
+        }
+
+        // Standard employees can only cancel their own bookings. Managers/heads can cancel any.
+        if ($_SESSION['role'] === 'employee' && $booking['employee_id'] !== $_SESSION['user_id']) {
+            echo json_encode(['error' => 'You can only cancel your own bookings.']);
+            exit;
+        }
+
+        $db->prepare("UPDATE bookings SET status = 'Cancelled' WHERE id = ?")->execute([$booking_id]);
+        
+        $stmtAsset = $db->prepare("SELECT tag FROM assets WHERE id = ?");
+        $stmtAsset->execute([$booking['asset_id']]);
+        $tag = $stmtAsset->fetchColumn();
+
+        log_activity($db, $_SESSION['user_id'], 'Cancelled Booking', "Cancelled booking ID $booking_id for asset $tag");
+        echo json_encode(['success' => 'Booking cancelled successfully.']);
+        break;
+
+    // ------------------------------------------
+    // 7. MAINTENANCE MANAGEMENT
+    // ------------------------------------------
+    case 'get_maintenance':
+        require_login();
+        
+        $sql = "SELECT mr.*, a.tag, a.name as asset_name, a.status as asset_status, e.name as reporter_name 
+                FROM maintenance_requests mr
+                JOIN assets a ON mr.asset_id = a.id
+                JOIN employees e ON mr.reported_by = e.id
+                ORDER BY mr.created_at DESC";
+        $requests = $db->query($sql)->fetchAll();
+
+        echo json_encode($requests);
+        break;
+
+    case 'raise_maintenance':
+        require_login();
+        $asset_id = (int)($data['asset_id'] ?? 0);
+        $description = trim($data['description'] ?? '');
+        $priority = $data['priority'] ?? 'Medium';
+
+        if (!$asset_id || !$description) {
+            echo json_encode(['error' => 'Asset and description are required.']);
+            exit;
+        }
+
+        // Record request
+        $stmt = $db->prepare("
+            INSERT INTO maintenance_requests (asset_id, reported_by, description, priority, status) 
+            VALUES (?, ?, ?, ?, 'Pending')
+        ");
+        $stmt->execute([$asset_id, $_SESSION['user_id'], $description, $priority]);
+
+        $stmtTag = $db->prepare("SELECT tag FROM assets WHERE id = ?");
+        $stmtTag->execute([$asset_id]);
+        $tag = $stmtTag->fetchColumn();
+
+        log_activity($db, $_SESSION['user_id'], 'Raised Maintenance Ticket', "Raised maintenance ticket for $tag. Priority: $priority");
+        create_notification($db, null, 'New Maintenance Request', "A ticket has been raised for asset $tag. Priority: $priority.", 'warning');
+
+        echo json_encode(['success' => 'Maintenance request raised successfully. Waiting for Manager review.']);
+        break;
+
+    case 'approve_maintenance':
+        require_role(['admin', 'asset_manager']);
+        $request_id = (int)($data['request_id'] ?? 0);
+        $decision = $data['decision'] ?? ''; // 'Approved' or 'Rejected'
+
+        if (!$request_id || !in_array($decision, ['Approved', 'Rejected'])) {
+            echo json_encode(['error' => 'Request ID and decision (Approved/Rejected) are required.']);
+            exit;
+        }
+
+        $stmt = $db->prepare("SELECT * FROM maintenance_requests WHERE id = ? AND status = 'Pending'");
+        $stmt->execute([$request_id]);
+        $req = $stmt->fetch();
+
+        if (!$req) {
+            echo json_encode(['error' => 'Pending maintenance request not found.']);
+            exit;
+        }
+
+        $db->beginTransaction();
+
+        if ($decision === 'Approved') {
+            // Update request
+            $db->prepare("UPDATE maintenance_requests SET status = 'Approved' WHERE id = ?")->execute([$request_id]);
+            // Flip Asset state to Under Maintenance
+            $db->prepare("UPDATE assets SET status = 'Under Maintenance' WHERE id = ?")->execute([$req['asset_id']]);
+            
+            log_activity($db, $_SESSION['user_id'], 'Approved Maintenance', "Approved maintenance request for asset ID {$req['asset_id']}");
+            create_notification($db, $req['reported_by'], 'Maintenance Approved', "Your maintenance request has been approved. Asset status flipped to Under Maintenance.", 'success');
+        } else {
+            $db->prepare("UPDATE maintenance_requests SET status = 'Rejected' WHERE id = ?")->execute([$request_id]);
+            log_activity($db, $_SESSION['user_id'], 'Rejected Maintenance', "Rejected maintenance request ID $request_id");
+            create_notification($db, $req['reported_by'], 'Maintenance Rejected', "Your maintenance request has been rejected.", 'danger');
+        }
+
+        $db->commit();
+
+        echo json_encode(['success' => "Maintenance request successfully " . strtolower($decision)]);
+        break;
+
+    case 'update_maintenance_status':
+        require_role(['admin', 'asset_manager']);
+        $request_id = (int)($data['request_id'] ?? 0);
+        $status = $data['status'] ?? ''; // 'Technician Assigned', 'In Progress', 'Resolved'
+        $technician = trim($data['assigned_technician'] ?? '');
+        $notes = trim($data['notes'] ?? '');
+
+        if (!$request_id || !in_array($status, ['Technician Assigned', 'In Progress', 'Resolved'])) {
+            echo json_encode(['error' => 'Valid request ID and target status required.']);
+            exit;
+        }
+
+        $stmt = $db->prepare("SELECT * FROM maintenance_requests WHERE id = ?");
+        $stmt->execute([$request_id]);
+        $req = $stmt->fetch();
+
+        if (!$req) {
+            echo json_encode(['error' => 'Maintenance request not found.']);
+            exit;
+        }
+
+        $db->beginTransaction();
+
+        // Update fields
+        $sqlUp = "UPDATE maintenance_requests SET status = ?, notes = ?";
+        $params = [$status, $notes];
+
+        if ($technician) {
+            $sqlUp .= ", assigned_technician = ?";
+            $params[] = $technician;
+        }
+        $sqlUp .= " WHERE id = ?";
+        $params[] = $request_id;
+
+        $db->prepare($sqlUp)->execute($params);
+
+        if ($status === 'Resolved') {
+            // Flip Asset state back to Available
+            $db->prepare("UPDATE assets SET status = 'Available' WHERE id = ?")->execute([$req['asset_id']]);
+            
+            log_activity($db, $_SESSION['user_id'], 'Resolved Maintenance', "Maintenance resolved for asset ID {$req['asset_id']}. Notes: $notes");
+            create_notification($db, $req['reported_by'], 'Maintenance Resolved', "Repairs for your reported asset are complete. Status set to Available.", 'success');
+        } else {
+            log_activity($db, $_SESSION['user_id'], 'Updated Maintenance Status', "Status for maintenance request ID $request_id changed to: $status");
+        }
+
+        $db->commit();
+
+        echo json_encode(['success' => 'Maintenance status updated successfully.']);
+        break;
+
+    // ------------------------------------------
+    // 8. ASSET AUDIT
+    // ------------------------------------------
+    case 'get_audits':
+        require_login();
+        
+        // Return audit cycles and the assigned auditors
+        $sql = "SELECT ac.*, d.name as department_name, e.name as creator_name
+                FROM audit_cycles ac
+                LEFT JOIN departments d ON ac.department_id = d.id
+                JOIN employees e ON ac.created_by = e.id
+                ORDER BY ac.created_at DESC";
+        $cycles = $db->query($sql)->fetchAll();
+
+        foreach ($cycles as &$c) {
+            // Get auditors names
+            $stmtAud = $db->prepare("
+                SELECT e.name 
+                FROM audit_auditors aa
+                JOIN employees e ON aa.employee_id = e.id
+                WHERE aa.audit_cycle_id = ?
+            ");
+            $stmtAud->execute([$c['id']]);
+            $c['auditors'] = $stmtAud->fetchAll(PDO::FETCH_COLUMN);
+        }
+
+        echo json_encode($cycles);
+        break;
+
+    case 'create_audit_cycle':
+        require_role('admin');
+        $name = trim($data['name'] ?? '');
+        $department_id = !empty($data['department_id']) ? (int)$data['department_id'] : null;
+        $location = trim($data['location'] ?? '');
+        $start_date = $data['start_date'] ?? date('Y-m-d');
+        $end_date = $data['end_date'] ?? date('Y-m-d', strtotime('+30 days'));
+        $auditor_ids = $data['auditor_ids'] ?? []; // Array of employee IDs
+
+        if (!$name || (empty($department_id) && !$location) || empty($auditor_ids)) {
+            echo json_encode(['error' => 'Name, at least one scope boundary (department or location), and at least one auditor are required.']);
+            exit;
+        }
+
+        $db->beginTransaction();
+
+        // Create cycle
+        $stmtC = $db->prepare("
+            INSERT INTO audit_cycles (name, department_id, location, start_date, end_date, status, created_by) 
+            VALUES (?, ?, ?, ?, ?, 'Active', ?)
+        ");
+        $stmtC->execute([$name, $department_id, $location, $start_date, $end_date, $_SESSION['user_id']]);
+        $cycleId = $db->lastInsertId();
+
+        // Add auditors
+        $stmtAud = $db->prepare("INSERT INTO audit_auditors (audit_cycle_id, employee_id) VALUES (?, ?)");
+        foreach ($auditor_ids as $audId) {
+            $stmtAud->execute([$cycleId, (int)$audId]);
+            create_notification($db, $audId, 'Assigned as Auditor', "You have been assigned as an auditor for cycle: $name", 'info');
+        }
+
+        // Query assets within scope to pre-populate audit_items
+        $sqlAssets = "SELECT id FROM assets WHERE 1=1";
+        $scopeParams = [];
+
+        if ($department_id) {
+            // Assets currently allocated to this department or employees in this department
+            $sqlAssets .= " AND id IN (
+                SELECT asset_id FROM allocations 
+                WHERE status IN ('Active', 'Overdue') 
+                AND (department_id = ? OR employee_id IN (SELECT id FROM employees WHERE department_id = ?))
+            )";
+            $scopeParams[] = $department_id;
+            $scopeParams[] = $department_id;
+        }
+
+        if ($location) {
+            $sqlAssets .= " AND location = ?";
+            $scopeParams[] = $location;
+        }
+
+        $stmtQuery = $db->prepare($sqlAssets);
+        $stmtQuery->execute($scopeParams);
+        $scopeAssets = $stmtQuery->fetchAll(PDO::FETCH_COLUMN);
+
+        // Prepopulate items
+        if (!empty($scopeAssets)) {
+            $stmtItem = $db->prepare("INSERT INTO audit_items (audit_cycle_id, asset_id, status) VALUES (?, ?, 'Pending')");
+            foreach ($scopeAssets as $aId) {
+                $stmtItem->execute([$cycleId, $aId]);
+            }
+        }
+
+        log_activity($db, $_SESSION['user_id'], 'Created Audit Cycle', "Created audit cycle '$name' with " . count($scopeAssets) . " assets in scope.");
+        
+        $db->commit();
+
+        echo json_encode(['success' => 'Audit cycle created successfully.']);
+        break;
+
+    case 'get_audit_items':
+        require_login();
+        $cycle_id = (int)($_GET['cycle_id'] ?? 0);
+
+        if (!$cycle_id) {
+            echo json_encode(['error' => 'Audit cycle ID required.']);
+            exit;
+        }
+
+        $stmt = $db->prepare("
+            SELECT ai.*, a.tag, a.name as asset_name, a.location, a.status as current_status,
+            e.name as holder_name
+            FROM audit_items ai
+            JOIN assets a ON ai.asset_id = a.id
+            LEFT JOIN allocations al ON al.asset_id = a.id AND al.status = 'Active'
+            LEFT JOIN employees e ON al.employee_id = e.id
+            WHERE ai.audit_cycle_id = ?
+        ");
+        $stmt->execute([$cycle_id]);
+        $items = $stmt->fetchAll();
+
+        echo json_encode($items);
+        break;
+
+    case 'update_audit_item':
+        require_login();
+        $item_id = (int)($data['item_id'] ?? 0);
+        $status = $data['status'] ?? ''; // 'Verified', 'Missing', 'Damaged'
+        $notes = trim($data['notes'] ?? '');
+
+        if (!$item_id || !in_array($status, ['Verified', 'Missing', 'Damaged'])) {
+            echo json_encode(['error' => 'Valid item ID and status (Verified/Missing/Damaged) are required.']);
+            exit;
+        }
+
+        // Verify auditor is assigned to this cycle
+        $stmtCycle = $db->prepare("
+            SELECT ac.* FROM audit_cycles ac
+            JOIN audit_items ai ON ai.audit_cycle_id = ac.id
+            WHERE ai.id = ?
+        ");
+        $stmtCycle->execute([$item_id]);
+        $cycle = $stmtCycle->fetch();
+
+        if (!$cycle) {
+            echo json_encode(['error' => 'Audit cycle context not found.']);
+            exit;
+        }
+
+        if ($cycle['status'] === 'Closed') {
+            echo json_encode(['error' => 'Audit cycle is closed and locked. No modifications allowed.']);
+            exit;
+        }
+
+        // Verify user is auditor or admin
+        if ($_SESSION['role'] !== 'admin') {
+            $stmtCheckAud = $db->prepare("SELECT COUNT(*) FROM audit_auditors WHERE audit_cycle_id = ? AND employee_id = ?");
+            $stmtCheckAud->execute([$cycle['id'], $_SESSION['user_id']]);
+            if ($stmtCheckAud->fetchColumn() == 0) {
+                echo json_encode(['error' => 'Unauthorized. You are not assigned as an auditor for this cycle.']);
+                exit;
+            }
+        }
+
+        // Update item status
+        $stmtUp = $db->prepare("UPDATE audit_items SET status = ?, notes = ? WHERE id = ?");
+        $stmtUp->execute([$status, $notes, $item_id]);
+
+        echo json_encode(['success' => 'Audit item status logged.']);
+        break;
+
+    case 'close_audit_cycle':
+        require_role('admin');
+        $cycle_id = (int)($data['cycle_id'] ?? 0);
+
+        if (!$cycle_id) {
+            echo json_encode(['error' => 'Audit cycle ID required.']);
+            exit;
+        }
+
+        $stmt = $db->prepare("SELECT * FROM audit_cycles WHERE id = ? AND status = 'Active'");
+        $stmt->execute([$cycle_id]);
+        $cycle = $stmt->fetch();
+
+        if (!$cycle) {
+            echo json_encode(['error' => 'Active audit cycle not found.']);
+            exit;
+        }
+
+        $db->beginTransaction();
+
+        // 1. Fetch flagged items that are missing
+        $stmtItems = $db->prepare("SELECT * FROM audit_items WHERE audit_cycle_id = ?");
+        $stmtItems->execute([$cycle_id]);
+        $items = $stmtItems->fetchAll();
+
+        $missingCount = 0;
+        $damagedCount = 0;
+
+        foreach ($items as $item) {
+            if ($item['status'] === 'Missing') {
+                // Update Asset state to 'Lost'
+                $db->prepare("UPDATE assets SET status = 'Lost' WHERE id = ?")->execute([$item['asset_id']]);
+                
+                // Cancel active allocation
+                $db->prepare("
+                    UPDATE allocations 
+                    SET actual_return_date = CURRENT_TIMESTAMP, status = 'Returned', condition_on_return = 'Lost in Audit' 
+                    WHERE asset_id = ? AND status IN ('Active', 'Overdue')
+                ")->execute([$item['asset_id']]);
+
+                $missingCount++;
+            } else if ($item['status'] === 'Damaged') {
+                // Update asset condition
+                $db->prepare("UPDATE assets SET condition_state = 'Damaged' WHERE id = ?")->execute([$item['asset_id']]);
+                $damagedCount++;
+            }
+        }
+
+        // 2. Lock cycle
+        $db->prepare("UPDATE audit_cycles SET status = 'Closed' WHERE id = ?")->execute([$cycle_id]);
+
+        log_activity($db, $_SESSION['user_id'], 'Closed Audit Cycle', "Locked audit cycle ID $cycle_id. Results: $missingCount assets flagged Lost, $damagedCount flagged Damaged.");
+        
+        // System wide notification of results
+        create_notification(
+            $db, 
+            null, 
+            'Audit Cycle Closed', 
+            "Audit '{$cycle['name']}' has been closed. Discrepancy report: $missingCount assets confirmed Missing (reverted to Lost), $damagedCount assets flagged Damaged.", 
+            $missingCount > 0 ? 'danger' : 'info'
+        );
+
+        $db->commit();
+
+        echo json_encode(['success' => 'Audit cycle locked and discrepancy reports generated. Affected asset states updated.']);
+        break;
