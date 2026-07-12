@@ -402,3 +402,170 @@ switch ($action) {
         echo json_encode(['success' => 'Employee promoted/updated successfully']);
         break;
 
+ // 4. ASSET REGISTRATION & DIRECTORY
+    // ------------------------------------------
+    case 'get_assets':
+        require_login();
+        
+        // Base Query
+        $sql = "SELECT a.*, c.name as category_name, 
+                e.name as holder_name, d.name as dept_holder_name
+                FROM assets a
+                JOIN categories c ON a.category_id = c.id
+                LEFT JOIN allocations al ON al.asset_id = a.id AND al.status = 'Active'
+                LEFT JOIN employees e ON al.employee_id = e.id
+                LEFT JOIN departments d ON al.department_id = d.id
+                WHERE 1=1";
+        
+        $params = [];
+        
+        // Filters
+        $search = trim($_GET['search'] ?? '');
+        if ($search) {
+            $sql .= " AND (a.tag LIKE ? OR a.serial_number LIKE ? OR a.name LIKE ?)";
+            $params[] = "%$search%";
+            $params[] = "%$search%";
+            $params[] = "%$search%";
+        }
+
+        $category = $_GET['category'] ?? '';
+        if ($category) {
+            $sql .= " AND a.category_id = ?";
+            $params[] = (int)$category;
+        }
+
+        $status = $_GET['status'] ?? '';
+        if ($status) {
+            $sql .= " AND a.status = ?";
+            $params[] = $status;
+        }
+
+        $location = $_GET['location'] ?? '';
+        if ($location) {
+            $sql .= " AND a.location = ?";
+            $params[] = $location;
+        }
+
+        $bookable = $_GET['bookable'] ?? '';
+        if ($bookable !== '') {
+            $sql .= " AND a.is_shared = ?";
+            $params[] = (int)$bookable;
+        }
+
+        $stmt = $db->prepare($sql);
+        $stmt->execute($params);
+        $assets = $stmt->fetchAll();
+
+        echo json_encode($assets);
+        break;
+
+    case 'get_asset_details':
+        require_login();
+        $id = (int)($_GET['id'] ?? 0);
+
+        if (!$id) {
+            echo json_encode(['error' => 'Asset ID required']);
+            exit;
+        }
+
+        // General asset details
+        $stmt = $db->prepare("
+            SELECT a.*, c.name as category_name, c.custom_fields as category_fields
+            FROM assets a
+            JOIN categories c ON a.category_id = c.id
+            WHERE a.id = ?
+        ");
+        $stmt->execute([$id]);
+        $asset = $stmt->fetch();
+
+        if (!$asset) {
+            echo json_encode(['error' => 'Asset not found']);
+            exit;
+        }
+
+        // Current active allocation
+        $stmt = $db->prepare("
+            SELECT al.*, e.name as employee_name, e.email as employee_email, d.name as department_name 
+            FROM allocations al
+            LEFT JOIN employees e ON al.employee_id = e.id
+            LEFT JOIN departments d ON al.department_id = d.id
+            WHERE al.asset_id = ? AND al.status IN ('Active', 'Overdue')
+        ");
+        $stmt->execute([$id]);
+        $active_allocation = $stmt->fetch();
+
+        // History: Allocations & returns
+        $stmt = $db->prepare("
+            SELECT al.*, e.name as employee_name, d.name as department_name, ab.name as allocator_name 
+            FROM allocations al
+            LEFT JOIN employees e ON al.employee_id = e.id
+            LEFT JOIN departments d ON al.department_id = d.id
+            LEFT JOIN employees ab ON al.allocated_by = ab.id
+            WHERE al.asset_id = ?
+            ORDER BY al.allocation_date DESC
+        ");
+        $stmt->execute([$id]);
+        $allocation_history = $stmt->fetchAll();
+
+        // History: Maintenance Logs
+        $stmt = $db->prepare("
+            SELECT mr.*, e.name as reporter_name 
+            FROM maintenance_requests mr
+            LEFT JOIN employees e ON mr.reported_by = e.id
+            WHERE mr.asset_id = ?
+            ORDER BY mr.created_at DESC
+        ");
+        $stmt->execute([$id]);
+        $maintenance_history = $stmt->fetchAll();
+
+        echo json_encode([
+            'asset' => $asset,
+            'active_allocation' => $active_allocation,
+            'allocation_history' => $allocation_history,
+            'maintenance_history' => $maintenance_history
+        ]);
+        break;
+
+    case 'register_asset':
+        require_role(['admin', 'asset_manager']);
+        $name = trim($data['name'] ?? '');
+        $category_id = (int)($data['category_id'] ?? 0);
+        $serial_number = trim($data['serial_number'] ?? '');
+        $acquisition_date = $data['acquisition_date'] ?? date('Y-m-d');
+        $acquisition_cost = (float)($data['acquisition_cost'] ?? 0.0);
+        $condition_state = $data['condition_state'] ?? 'Good';
+        $location = trim($data['location'] ?? '');
+        $is_shared = !empty($data['is_shared']) ? 1 : 0;
+
+        if (!$name || !$category_id || !$serial_number || !$location) {
+            echo json_encode(['error' => 'Name, category, serial number and location are required.']);
+            exit;
+        }
+
+        // Verify serial number unique
+        $stmt = $db->prepare("SELECT COUNT(*) FROM assets WHERE serial_number = ?");
+        $stmt->execute([$serial_number]);
+        if ($stmt->fetchColumn() > 0) {
+            echo json_encode(['error' => 'An asset with this serial number already exists.']);
+            exit;
+        }
+
+        // Auto-generate unique asset tag: Query highest ID + 1
+        $maxId = (int)$db->query("SELECT MAX(id) FROM assets")->fetchColumn();
+        $nextTag = sprintf("AF-%04d", $maxId + 1);
+
+        $photo = trim($data['photo'] ?? '');
+        if ($photo === '') {
+            $photo = null;
+        }
+
+        $stmt = $db->prepare("
+            INSERT INTO assets (name, category_id, tag, serial_number, acquisition_date, acquisition_cost, condition_state, location, is_shared, status, photo) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Available', ?)
+        ");
+        $stmt->execute([$name, $category_id, $nextTag, $serial_number, $acquisition_date, $acquisition_cost, $condition_state, $location, $is_shared, $photo]);
+        $newAssetId = $db->lastInsertId();
+
+        log_activity($db, $_SESSION['user_id'], 'Registered Asset', "Registered asset '$name' with tag $nextTag");
+        echo json_encode(['success' => 'Asset registered successfully with tag ' . $nextTag, 'id' => $newAssetId]);
+        break;
