@@ -49,6 +49,34 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // ------------------------------------------
+    // 0. THEME SWITCHER CONTROLLER
+    // ------------------------------------------
+    const btnThemeToggle = document.getElementById('btn-theme-toggle');
+    if (btnThemeToggle) {
+        btnThemeToggle.addEventListener('click', () => {
+            const body = document.body;
+            const sunIcon = btnThemeToggle.querySelector('.sun-icon');
+            const moonIcon = btnThemeToggle.querySelector('.moon-icon');
+
+            if (body.classList.contains('light-theme')) {
+                body.classList.remove('light-theme');
+                body.classList.add('dark-theme');
+                sunIcon.classList.add('hidden');
+                moonIcon.classList.remove('hidden');
+                document.cookie = "theme=dark; path=/; max-age=31536000";
+                localStorage.setItem('theme', 'dark');
+            } else {
+                body.classList.remove('dark-theme');
+                body.classList.add('light-theme');
+                sunIcon.classList.remove('hidden');
+                moonIcon.classList.add('hidden');
+                document.cookie = "theme=light; path=/; max-age=31536000";
+                localStorage.setItem('theme', 'light');
+            }
+        });
+    }
+
+    // ------------------------------------------
     // 1. TOAST SYSTEM
     // ------------------------------------------
     function showToast(message, type = 'success') {
@@ -218,7 +246,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Specs metadata list
             const specsBody = document.getElementById('detail-specs-list');
-            specsBody.innerHTML = `
+            let specsHTML = `
                 <div class="spec-item"><span class="spec-name">Asset ID Code</span><span class="spec-val text-success">${asset.tag}</span></div>
                 <div class="spec-item"><span class="spec-name">Serial Number</span><span class="spec-val">${asset.serial_number}</span></div>
                 <div class="spec-item"><span class="spec-name">Purchase Date</span><span class="spec-val">${asset.acquisition_date}</span></div>
@@ -227,6 +255,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="spec-item"><span class="spec-name">Status</span><span class="status-pill status-${getAssetStatusClass(asset.status)}">${asset.status}</span></div>
                 <div class="spec-item"><span class="spec-name">Type</span><span class="spec-val">${asset.is_shared ? 'Shared Resource' : 'Individual Allocation'}</span></div>
             `;
+            if (asset.photo) {
+                specsHTML += `
+                    <div class="spec-item" style="flex-direction:column; align-items:flex-start; gap:8px; border-top:1px solid var(--border-color); padding-top:12px; width:100%;">
+                        <span class="spec-name" style="margin-bottom:4px;">Asset Photo</span>
+                        <img src="${asset.photo}" alt="Asset Photo" style="max-width:100%; max-height:150px; object-fit:cover; border-radius:6px; border:1px solid var(--border-color);" />
+                    </div>
+                `;
+            }
+            specsBody.innerHTML = specsHTML;
 
             try {
                 const customFields = JSON.parse(asset.category_fields || '{}');
@@ -417,35 +454,93 @@ document.addEventListener('DOMContentLoaded', () => {
     // ------------------------------------------
     // 7. MODALS DATA POPULATORS
     // ------------------------------------------
-    async function openAllocateModal(preSelectedAssetId = null) {
+    window.openAllocateModal = async function(preSelectedAssetId = null) {
         try {
-            const assets = await apiRequest('get_assets&status=Available');
+            const assets = await apiRequest('get_assets');
+            window.allocateModalAssets = assets;
+
             const assetSelect = document.getElementById('alloc-asset-id');
-            assetSelect.innerHTML = '<option value="">Select Available Asset</option>';
+            assetSelect.innerHTML = '<option value="">Select Asset</option>';
             assets.forEach(a => {
-                assetSelect.innerHTML += `<option value="${a.id}">${a.tag} - ${a.name}</option>`;
+                if (a.is_shared == 1) return; // skip shared bookable resources
+                const label = (a.status === 'Allocated' || a.status === 'Overdue') ? `${a.tag} - ${a.name} (${a.status})` : `${a.tag} - ${a.name}`;
+                assetSelect.innerHTML += `<option value="${a.id}">${label}</option>`;
             });
             if (preSelectedAssetId) assetSelect.value = preSelectedAssetId;
 
             const org = await apiRequest('get_org_setup');
-            const empSelect = document.getElementById('alloc-employee-id');
-            empSelect.innerHTML = '<option value="">Select Employee</option>';
-            org.employees.forEach(emp => {
-                if (emp.status === 'Active') {
-                    empSelect.innerHTML += `<option value="${emp.id}">${emp.name} (${emp.email})</option>`;
+
+            const empSelects = [
+                document.getElementById('alloc-employee-id'),
+                document.getElementById('alloc-trans-employee-id')
+            ];
+            empSelects.forEach(select => {
+                if (select) {
+                    select.innerHTML = '<option value="">Select Employee</option>';
+                    org.employees.forEach(emp => {
+                        if (emp.status === 'Active') {
+                            select.innerHTML += `<option value="${emp.id}">${emp.name} (${emp.email})</option>`;
+                        }
+                    });
                 }
             });
 
-            const deptSelect = document.getElementById('alloc-department-id');
-            deptSelect.innerHTML = '<option value="">Select Department</option>';
-            org.departments.forEach(dept => {
-                if (dept.status === 'Active') {
-                    deptSelect.innerHTML += `<option value="${dept.id}">${dept.name}</option>`;
+            const deptSelects = [
+                document.getElementById('alloc-department-id'),
+                document.getElementById('alloc-trans-department-id')
+            ];
+            deptSelects.forEach(select => {
+                if (select) {
+                    select.innerHTML = '<option value="">Select Department</option>';
+                    org.departments.forEach(dept => {
+                        if (dept.status === 'Active') {
+                            select.innerHTML += `<option value="${dept.id}">${dept.name}</option>`;
+                        }
+                    });
                 }
             });
+
+            toggleAllocateModalInputs();
 
             openModal(el.modalAllocateAsset);
         } catch (e) {}
+    }
+
+    function toggleAllocateModalInputs() {
+        const assetSelect = document.getElementById('alloc-asset-id');
+        const selectedId = assetSelect.value;
+        const conflictBanner = document.getElementById('alloc-conflict-banner');
+        const directFields = document.getElementById('alloc-direct-fields');
+        const transferFields = document.getElementById('alloc-transfer-fields');
+        const submitBtn = document.getElementById('alloc-submit-btn');
+
+        if (!selectedId) {
+            conflictBanner.classList.add('hidden');
+            directFields.classList.remove('hidden');
+            transferFields.classList.add('hidden');
+            submitBtn.textContent = 'Allocate';
+            return;
+        }
+
+        const asset = window.allocateModalAssets.find(a => a.id == selectedId);
+        if (asset && (asset.status === 'Allocated' || asset.status === 'Overdue')) {
+            const holder = asset.holder_name || asset.dept_holder_name || 'Staff Member';
+            conflictBanner.textContent = `Already Allocated to ${holder}. Direct re-allocation is blocked - submit a transfer request below.`;
+            conflictBanner.classList.remove('hidden');
+            directFields.classList.add('hidden');
+            transferFields.classList.remove('hidden');
+            submitBtn.textContent = 'Request Transfer';
+        } else {
+            conflictBanner.classList.add('hidden');
+            directFields.classList.remove('hidden');
+            transferFields.classList.add('hidden');
+            submitBtn.textContent = 'Allocate';
+        }
+    }
+
+    const assetSelectEl = document.getElementById('alloc-asset-id');
+    if (assetSelectEl) {
+        assetSelectEl.addEventListener('change', toggleAllocateModalInputs);
     }
 
     document.querySelectorAll('input[name="alloc-target"]').forEach(radio => {
@@ -460,14 +555,26 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    function openReturnModal(allocationId) {
+    document.querySelectorAll('input[name="alloc-trans-target"]').forEach(radio => {
+        radio.addEventListener('change', () => {
+            if (radio.value === 'employee') {
+                document.getElementById('alloc-trans-employee-group').classList.remove('hidden');
+                document.getElementById('alloc-trans-department-group').classList.add('hidden');
+            } else {
+                document.getElementById('alloc-trans-employee-group').classList.add('hidden');
+                document.getElementById('alloc-trans-department-group').classList.remove('hidden');
+            }
+        });
+    });
+
+    window.openReturnModal = function(allocationId) {
         document.getElementById('return-alloc-id').value = allocationId;
         document.getElementById('return-condition').value = 'Good';
         document.getElementById('return-notes').value = '';
         openModal(el.modalReturnAsset);
     }
 
-    async function openTransferModal(preSelectedTag = '') {
+    window.openTransferModal = async function(preSelectedTag = '') {
         document.getElementById('trans-asset-tag').value = preSelectedTag;
         try {
             const org = await apiRequest('get_org_setup');
@@ -489,6 +596,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
             openModal(el.modalRequestTransfer);
         } catch (e) {}
+    }
+
+    // Modal Action Buttons Click Event Listeners
+    const btnAllocateAssetModal = document.getElementById('btn-allocate-asset-modal');
+    if (btnAllocateAssetModal) {
+        btnAllocateAssetModal.addEventListener('click', () => {
+            window.openAllocateModal();
+        });
+    }
+
+    const btnRequestTransferModal = document.getElementById('btn-request-transfer-modal');
+    if (btnRequestTransferModal) {
+        btnRequestTransferModal.addEventListener('click', () => {
+            window.openTransferModal();
+        });
     }
 
     document.querySelectorAll('input[name="trans-target"]').forEach(radio => {
@@ -587,7 +709,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 acquisition_cost: document.getElementById('reg-cost').value,
                 condition_state: document.getElementById('reg-condition').value,
                 location: document.getElementById('reg-location').value,
-                is_shared: document.getElementById('reg-shared').checked ? 1 : 0
+                is_shared: document.getElementById('reg-shared').checked ? 1 : 0,
+                photo: document.getElementById('reg-photo').value || null
             };
             try {
                 const res = await apiRequest('register_asset', 'POST', body);
@@ -603,20 +726,43 @@ document.addEventListener('DOMContentLoaded', () => {
     if (el.formAllocateAsset) {
         el.formAllocateAsset.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const targetType = document.querySelector('input[name="alloc-target"]:checked').value;
-            const body = {
-                asset_id: document.getElementById('alloc-asset-id').value,
-                employee_id: targetType === 'employee' ? document.getElementById('alloc-employee-id').value : null,
-                department_id: targetType === 'department' ? document.getElementById('alloc-department-id').value : null,
-                expected_return_date: document.getElementById('alloc-return-date').value
-            };
-            try {
-                const res = await apiRequest('allocate_asset', 'POST', body);
-                if (res.success) {
-                    queueToast(res.success, 'success');
-                    window.location.reload();
-                }
-            } catch (err) {}
+            const isTransferMode = !document.getElementById('alloc-conflict-banner').classList.contains('hidden');
+
+            if (isTransferMode) {
+                const targetType = document.querySelector('input[name="alloc-trans-target"]:checked').value;
+                const assetId = document.getElementById('alloc-asset-id').value;
+                const asset = window.allocateModalAssets.find(a => a.id == assetId);
+                const assetTag = asset ? asset.tag : '';
+
+                const body = {
+                    asset_tag: assetTag,
+                    to_employee_id: targetType === 'employee' ? document.getElementById('alloc-trans-employee-id').value : null,
+                    to_department_id: targetType === 'department' ? document.getElementById('alloc-trans-department-id').value : null,
+                    reason: document.getElementById('alloc-trans-reason').value
+                };
+                try {
+                    const res = await apiRequest('request_transfer', 'POST', body);
+                    if (res.success) {
+                        queueToast(res.success, 'success');
+                        window.location.reload();
+                    }
+                } catch (err) {}
+            } else {
+                const targetType = document.querySelector('input[name="alloc-target"]:checked').value;
+                const body = {
+                    asset_id: document.getElementById('alloc-asset-id').value,
+                    employee_id: targetType === 'employee' ? document.getElementById('alloc-employee-id').value : null,
+                    department_id: targetType === 'department' ? document.getElementById('alloc-department-id').value : null,
+                    expected_return_date: document.getElementById('alloc-return-date').value
+                };
+                try {
+                    const res = await apiRequest('allocate_asset', 'POST', body);
+                    if (res.success) {
+                        queueToast(res.success, 'success');
+                        window.location.reload();
+                    }
+                } catch (err) {}
+            }
         });
     }
 
@@ -1009,6 +1155,23 @@ document.addEventListener('DOMContentLoaded', () => {
         const transBtn = document.querySelector('[data-subtab="subtab-transfers"]');
         if (transBtn) transBtn.click();
     }
+
+    // Initiate Return action click for employees
+    document.querySelectorAll('.btn-initiate-return').forEach(b => {
+        b.addEventListener('click', async () => {
+            const allocId = b.getAttribute('data-alloc-id');
+            if (!confirm('Are you sure you want to initiate return for this asset? This will alert the Asset Manager to check-in your device.')) return;
+            try {
+                const res = await apiRequest('initiate_return', 'POST', {
+                    allocation_id: allocId
+                });
+                if (res.success) {
+                    queueToast(res.success, 'success');
+                    window.location.reload();
+                }
+            } catch (e) {}
+        });
+    });
 
     // --- VIEW: BOOKINGS ---
     document.querySelectorAll('.btn-cancel-booking').forEach(b => {
