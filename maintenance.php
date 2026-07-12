@@ -52,84 +52,691 @@ function get_priority_class($priority) {
     return 'status-available';
 }
 ?>
+<?php
+// Compute KPIs for the new UI
+$total_tickets = count($requests);
+$pending_count = 0;
+$repair_count = 0;
+$resolved_count = 0;
+$high_priority_count = 0;
 
-<section id="view-maintenance" class="app-view">
-    <div class="pane-header" style="margin-bottom: 20px;">
-        <h3>Maintenance & Repairs Log (Kanban Board)</h3>
-        <button class="btn btn-primary btn-sm" id="btn-raise-maintenance-modal">Raise Ticket</button>
+$assets_list = [];
+$techs_list = [];
+
+foreach ($requests as $r) {
+    if ($r['status'] === 'Pending') $pending_count++;
+    if ($r['status'] === 'In Progress') $repair_count++;
+    if ($r['status'] === 'Resolved' || $r['status'] === 'Rejected') $resolved_count++;
+    if ($r['priority'] === 'High' || $r['priority'] === 'Critical') $high_priority_count++;
+    
+    if (!empty($r['asset_name'])) $assets_list[$r['asset_name']] = true;
+    if (!empty($r['assigned_technician'])) $techs_list[$r['assigned_technician']] = true;
+}
+$assets_list = array_keys($assets_list);
+$techs_list = array_keys($techs_list);
+?>
+
+
+<style>
+/* Maintenance page specific styles */
+.maintenance-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    width: 100%;
+}
+
+.maint-breadcrumb-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.maint-breadcrumbs {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.88rem;
+}
+
+.maint-breadcrumbs .db {
+    color: var(--text-muted);
+}
+
+.maint-breadcrumbs .slash {
+    color: var(--border-color);
+}
+
+.maint-breadcrumbs .curr {
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+/* KPI Cards Layout */
+.kpi-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+}
+
+.kpi-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    box-shadow: var(--shadow);
+    transition: var(--transition);
+}
+
+.kpi-card:hover {
+    transform: translateY(-3px);
+    border-color: var(--border-hover);
+}
+
+.kpi-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+    flex-shrink: 0;
+}
+
+.kpi-c1 { background: rgba(99, 102, 241, 0.1); color: var(--color-primary); }
+.kpi-c2 { background: rgba(245, 158, 11, 0.1); color: var(--color-warning); }
+.kpi-c3 { background: rgba(59, 130, 246, 0.1); color: var(--color-info); }
+.kpi-c4 { background: rgba(16, 185, 129, 0.1); color: var(--color-success); }
+.kpi-c5 { background: rgba(239, 68, 68, 0.1); color: var(--color-danger); }
+
+.kpi-content {
+    display: flex;
+    flex-direction: column;
+}
+
+.kpi-title {
+    margin: 0;
+    font-size: 0.76rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+}
+
+.kpi-value {
+    font-family: var(--font-outfit);
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 2px 0;
+}
+
+.kpi-sub {
+    margin: 0;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+}
+
+/* Toolbar & Filters */
+.filter-toolbar {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    box-shadow: var(--shadow);
+}
+
+.filter-group {
+    position: relative;
+    display: flex;
+    align-items: center;
+    flex-grow: 1;
+}
+
+.search-input-group {
+    flex-grow: 2.5;
+}
+
+.filter-group i {
+    position: absolute;
+    left: 12px;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+.filter-input {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.02) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 8px !important;
+    color: var(--text-primary) !important;
+    font-size: 0.85rem !important;
+    height: 38px !important;
+    padding: 8px 12px !important;
+    transition: var(--transition);
+}
+
+.search-input {
+    padding-left: 36px !important;
+}
+
+.filter-input:focus {
+    border-color: var(--color-primary) !important;
+    background: rgba(255, 255, 255, 0.04) !important;
+    box-shadow: 0 0 8px rgba(99, 102, 241, 0.15);
+    outline: none;
+}
+
+/* Kanban Board Layout styles */
+.kanban-container {
+    width: 100%;
+    overflow-x: auto;
+    padding-bottom: 12px;
+}
+
+.kanban-board {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    min-width: max-content;
+    padding: 10px 2px;
+}
+
+.kb-col {
+    width: 280px;
+    flex-shrink: 0;
+    background: rgba(255, 255, 255, 0.015);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    max-height: 72vh;
+    overflow-y: auto;
+}
+
+.kb-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 10px;
+}
+
+.kb-title-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.kb-title {
+    margin: 0;
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.kb-count {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 12px;
+}
+
+.kb-items {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.t-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 14px;
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    transition: var(--transition);
+}
+
+.t-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--border-hover);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
+.t-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+}
+
+.t-tag {
+    font-size: 0.72rem;
+    padding: 2px 6px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-secondary);
+}
+
+/* Priority labels */
+.t-prio {
+    font-size: 0.65rem;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 4px;
+    text-transform: uppercase;
+}
+.p-critical { background: rgba(239, 68, 68, 0.15); color: var(--color-danger); }
+.p-high { background: rgba(245, 158, 11, 0.15); color: var(--color-warning); }
+.p-medium { background: rgba(59, 130, 246, 0.15); color: var(--color-info); }
+.p-low { background: rgba(16, 185, 129, 0.15); color: var(--color-success); }
+
+.t-title {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.t-desc {
+    margin: 0;
+    font-size: 0.76rem;
+    color: var(--text-secondary);
+    line-height: 1.4;
+}
+
+.t-meta-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+}
+
+.t-notes {
+    font-size: 0.72rem;
+    font-style: italic;
+    background: rgba(255, 255, 255, 0.02);
+    border-left: 2px solid var(--color-primary);
+    padding: 4px 8px;
+    margin-top: 4px;
+    border-radius: 2px;
+    color: var(--text-secondary);
+}
+
+.t-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 4px;
+}
+
+.t-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 4px 10px;
+    height: 28px;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: var(--transition);
+    text-decoration: none;
+}
+
+.t-btn.primary {
+    background-color: var(--color-primary);
+    color: white;
+}
+
+.t-btn.primary:hover {
+    background-color: var(--color-primary-hover);
+}
+
+.t-btn.resolve {
+    background-color: var(--color-success);
+    color: white;
+}
+
+.t-btn.resolve:hover {
+    background-color: #059669;
+}
+
+.t-btn.view {
+    background-color: var(--color-secondary);
+    color: var(--text-primary);
+    border-color: var(--border-color);
+}
+
+.t-btn.view:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* Empty column state */
+.kb-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 30px 10px;
+    border: 1.5px dashed var(--border-color);
+    border-radius: 8px;
+    color: var(--text-muted);
+    gap: 8px;
+}
+.kb-empty i {
+    font-size: 1.6rem;
+}
+.kb-empty h4 {
+    margin: 0;
+    font-size: 0.8rem;
+    color: var(--text-primary);
+    font-weight: 600;
+}
+.kb-empty p {
+    margin: 0;
+    font-size: 0.7rem;
+    line-height: 1.3;
+}
+
+/* Column Header DOT colors */
+.kb-col[data-status="pending"] .kb-dot { width: 8px; height: 8px; border-radius: 50%; background-color: var(--text-muted); }
+.kb-col[data-status="approved"] .kb-dot { width: 8px; height: 8px; border-radius: 50%; background-color: var(--color-info); }
+.kb-col[data-status="tech_assigned"] .kb-dot { width: 8px; height: 8px; border-radius: 50%; background-color: var(--color-primary); }
+.kb-col[data-status="in_progress"] .kb-dot { width: 8px; height: 8px; border-radius: 50%; background-color: var(--color-warning); }
+.kb-col[data-status="resolved"] .kb-dot { width: 8px; height: 8px; border-radius: 50%; background-color: var(--color-success); }
+
+/* Light Theme overrides */
+body.light-theme .kb-col {
+    background: rgba(0, 0, 0, 0.015) !important;
+    border: 1px solid rgba(0, 0, 0, 0.06) !important;
+}
+body.light-theme .t-card {
+    background: #ffffff !important;
+    border: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+body.light-theme .kb-empty {
+    border: 1.5px dashed rgba(0, 0, 0, 0.08) !important;
+}
+</style>
+
+<div class="maintenance-wrapper">
+    
+    <!-- Breadcrumb Row -->
+    <div class="maint-breadcrumb-row">
+        <div class="maint-breadcrumbs">
+            <span class="db">Dashboard</span>
+            <span class="slash">/</span>
+            <span class="curr">Maintenance</span>
+        </div>
+        <button class="btn btn-primary" id="btn-raise-maintenance-modal">
+            <i class="bi bi-plus-lg"></i> Raise Maintenance Ticket
+        </button>
     </div>
 
-    <div class="kanban-board">
-        <?php foreach ($columns as $colName => $items): ?>
-            <div class="kanban-column">
-                <div class="kanban-column-header">
-                    <h4><?php echo htmlspecialchars($colName); ?></h4>
-                    <span class="kanban-column-count"><?php echo count($items); ?></span>
+    <!-- KPI Cards -->
+    <div class="kpi-row">
+        <div class="kpi-card">
+            <div class="kpi-icon kpi-c1"><i class="bi bi-clipboard2-data"></i></div>
+            <div class="kpi-content">
+                <h4 class="kpi-title">Total Tickets</h4>
+                <div class="kpi-value" id="kpi-total"><?php echo $total_tickets; ?></div>
+                <p class="kpi-sub">All maintenance tickets</p>
+            </div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-icon kpi-c2"><i class="bi bi-clock-history"></i></div>
+            <div class="kpi-content">
+                <h4 class="kpi-title">Pending</h4>
+                <div class="kpi-value" id="kpi-pending"><?php echo $pending_count; ?></div>
+                <p class="kpi-sub">Awaiting approval</p>
+            </div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-icon kpi-c3"><i class="bi bi-wrench"></i></div>
+            <div class="kpi-content">
+                <h4 class="kpi-title">Under Repair</h4>
+                <div class="kpi-value" id="kpi-repair"><?php echo $repair_count; ?></div>
+                <p class="kpi-sub">Technician working</p>
+            </div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-icon kpi-c4"><i class="bi bi-check-circle"></i></div>
+            <div class="kpi-content">
+                <h4 class="kpi-title">Resolved</h4>
+                <div class="kpi-value" id="kpi-resolved"><?php echo $resolved_count; ?></div>
+                <p class="kpi-sub">Successfully resolved</p>
+            </div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-icon kpi-c5"><i class="bi bi-shield-exclamation"></i></div>
+            <div class="kpi-content">
+                <h4 class="kpi-title">High Priority</h4>
+                <div class="kpi-value" id="kpi-high"><?php echo $high_priority_count; ?></div>
+                <p class="kpi-sub">High & critical priority</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter Toolbar -->
+    <div class="filter-toolbar">
+        <div class="filter-group search-input-group">
+            <i class="bi bi-search"></i>
+            <input type="text" class="filter-input search-input" id="filter-search" placeholder="Search by asset, tag, reporter, technician or issue...">
+        </div>
+        <div class="filter-group">
+            <select class="filter-input select-input" id="filter-prio">
+                <option value="">All Priorities</option>
+                <option value="Critical">Critical</option>
+                <option value="High">High</option>
+                <option value="Medium">Medium</option>
+                <option value="Low">Low</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <select class="filter-input select-input" id="filter-asset">
+                <option value="">All Assets</option>
+                <?php foreach($assets_list as $ast): ?>
+                    <option value="<?php echo htmlspecialchars($ast); ?>"><?php echo htmlspecialchars($ast); ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div class="filter-group">
+            <select class="filter-input select-input" id="filter-tech">
+                <option value="">All Technicians</option>
+                <?php foreach($techs_list as $tech): ?>
+                    <option value="<?php echo htmlspecialchars($tech); ?>"><?php echo htmlspecialchars($tech); ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <button class="btn btn-secondary btn-sm" id="btn-clear-filters" style="height: 38px;">
+            <i class="bi bi-arrow-clockwise"></i> Clear Filters
+        </button>
+    </div>
+    <span class="showing-text" id="showing-text">Showing <?php echo $total_tickets; ?> of <?php echo $total_tickets; ?> tickets</span>
+
+    <!-- Kanban Wrapper -->
+    <div class="kanban-container">
+        <div class="kanban-board">
+            
+            <?php 
+            $kanban_cols = [
+                'Pending' => 'pending',
+                'Approved' => 'approved',
+                'Technician Assigned' => 'tech_assigned',
+                'In Progress' => 'in_progress',
+                'Resolved' => 'resolved'
+            ];
+            
+            foreach ($kanban_cols as $colName => $colKey): 
+                $items = $columns[$colName] ?? [];
+            ?>
+            <div class="kb-col" data-status="<?php echo $colKey; ?>">
+                <div class="kb-header">
+                    <div class="kb-title-wrap">
+                        <div class="kb-dot"></div>
+                        <span class="kb-title"><?php echo htmlspecialchars($colName); ?></span>
+                    </div>
+                    <span class="kb-count count-badge"><?php echo count($items); ?></span>
                 </div>
                 
-                <?php if (empty($items)): ?>
-                    <div style="font-size: 0.78rem; color: var(--text-muted); text-align: center; padding: 30px 0; font-style: italic;">No tickets in this stage.</div>
-                <?php else: ?>
-                    <?php foreach ($items as $req): ?>
-                        <div class="kanban-card">
-                            <div class="kanban-card-title">
-                                <span class="asset-tag" style="font-size: 0.72rem; padding: 2px 6px;"><?php echo htmlspecialchars($req['tag']); ?></span>
-                                <span class="status-pill status-<?php echo get_priority_class($req['priority']); ?>" style="font-size: 0.68rem; padding: 1px 6px;"><?php echo htmlspecialchars($req['priority']); ?></span>
-                            </div>
-                            <strong style="font-size: 0.85rem; color: var(--text-primary); margin-top: 4px;"><?php echo htmlspecialchars($req['asset_name']); ?></strong>
-                            <p class="kanban-card-desc" style="margin: 6px 0;"><?php echo htmlspecialchars($req['description']); ?></p>
-                            
-                            <div class="kanban-card-meta">
-                                <span>Reporter: <strong><?php echo htmlspecialchars($req['reporter_name']); ?></strong></span>
-                                <?php if ($req['assigned_technician']): ?>
-                                    <span style="font-style: italic;">Tech: <?php echo htmlspecialchars($req['assigned_technician']); ?></span>
-                                <?php endif; ?>
-                            </div>
-                            
-                            <?php if ($req['notes'] !== '' && $req['notes'] !== null): ?>
-                                <div style="font-size: 0.7rem; background: rgba(0,0,0,0.08); border-left: 2px solid var(--border-color); padding: 6px; border-radius: 4px; margin-top: 4px; color: var(--text-secondary);">
-                                    <strong>Notes:</strong> <?php echo htmlspecialchars($req['notes']); ?>
-                                </div>
+                <div class="kb-items" style="display: flex; flex-direction: column; gap: 12px; min-height: 150px;">
+                    <?php if (empty($items)): ?>
+                        <div class="kb-empty <?php echo $colKey === 'resolved' ? 'success' : ''; ?>">
+                            <?php if ($colKey === 'resolved'): ?>
+                                <i class="bi bi-check-circle" style="color: var(--color-success);"></i>
+                                <h4>No tickets in this stage</h4>
+                                <p>Tickets will appear here when they move to this status.</p>
+                            <?php else: ?>
+                                <i class="bi bi-inbox"></i>
+                                <h4>No tickets in this stage</h4>
+                                <p>Tickets will appear here when they move to this status.</p>
                             <?php endif; ?>
-
-                            <div class="kanban-card-actions">
-                                <?php if ($req['status'] === 'Pending'): ?>
-                                    <?php if ($user_role === 'admin' || $user_role === 'asset_manager'): ?>
-                                        <button class="btn btn-success btn-sm btn-approve-maint" data-id="<?php echo $req['id']; ?>" style="padding: 2px 8px; font-size: 0.7rem;">Approve</button>
-                                        <button class="btn btn-danger btn-sm btn-reject-maint" data-id="<?php echo $req['id']; ?>" style="padding: 2px 8px; font-size: 0.7rem;">Reject</button>
-                                    <?php else: ?>
-                                        <span style="font-size: 0.72rem; color: var(--color-warning); font-style: italic;">Awaiting Review</span>
-                                    <?php endif; ?>
-                                <?php elseif ($req['status'] === 'Approved'): ?>
-                                    <?php if ($user_role === 'admin' || $user_role === 'asset_manager'): ?>
-                                        <button class="btn btn-primary btn-sm btn-update-maint" data-id="<?php echo $req['id']; ?>" data-status="Technician Assigned" data-tech="<?php echo htmlspecialchars($req['assigned_technician'] ?? ''); ?>" data-notes="<?php echo htmlspecialchars($req['notes'] ?? ''); ?>" style="padding: 2px 8px; font-size: 0.7rem;">Assign Tech</button>
-                                    <?php else: ?>
-                                        <span style="font-size: 0.72rem; color: var(--color-success); font-style: italic;">Approved</span>
-                                    <?php endif; ?>
-                                <?php elseif ($req['status'] === 'Technician Assigned'): ?>
-                                    <?php if ($user_role === 'admin' || $user_role === 'asset_manager'): ?>
-                                        <button class="btn btn-secondary btn-sm btn-update-maint" data-id="<?php echo $req['id']; ?>" data-status="In Progress" data-tech="<?php echo htmlspecialchars($req['assigned_technician'] ?? ''); ?>" data-notes="<?php echo htmlspecialchars($req['notes'] ?? ''); ?>" style="padding: 2px 8px; font-size: 0.7rem; background: var(--color-warning); border-color: var(--color-warning); color: #fff;">Start Work</button>
-                                    <?php else: ?>
-                                        <span style="font-size: 0.72rem; color: var(--text-muted); font-style: italic;">Assigned to <?php echo htmlspecialchars($req['assigned_technician']); ?></span>
-                                    <?php endif; ?>
-                                <?php elseif ($req['status'] === 'In Progress'): ?>
-                                    <?php if ($user_role === 'admin' || $user_role === 'asset_manager'): ?>
-                                        <button class="btn btn-success btn-sm btn-update-maint" data-id="<?php echo $req['id']; ?>" data-status="Resolved" data-tech="<?php echo htmlspecialchars($req['assigned_technician'] ?? ''); ?>" data-notes="<?php echo htmlspecialchars($req['notes'] ?? ''); ?>" style="padding: 2px 8px; font-size: 0.7rem;">Resolve</button>
-                                    <?php else: ?>
-                                        <span style="font-size: 0.72rem; color: var(--color-success); font-weight: 600;">In Progress</span>
-                                    <?php endif; ?>
-                                <?php elseif ($req['status'] === 'Resolved'): ?>
-                                    <span style="font-size: 0.72rem; color: var(--color-success); font-weight: 600;">✓ Resolved</span>
-                                <?php elseif ($req['status'] === 'Rejected'): ?>
-                                    <span style="font-size: 0.72rem; color: var(--color-danger); font-weight: 600;">✗ Rejected</span>
-                                <?php endif; ?>
-                            </div>
                         </div>
-                    <?php endforeach; ?>
-                <?php endif; ?>
+                    <?php else: ?>
+                        <?php foreach ($items as $req): ?>
+                        <div class="t-card" 
+                             data-search="<?php echo htmlspecialchars(strtolower($req['tag'].' '.$req['asset_name'].' '.$req['reporter_name'].' '.$req['assigned_technician'].' '.$req['description'])); ?>"
+                             data-prio="<?php echo htmlspecialchars($req['priority']); ?>"
+                             data-asset="<?php echo htmlspecialchars($req['asset_name']); ?>"
+                             data-tech="<?php echo htmlspecialchars($req['assigned_technician'] ?? ''); ?>">
+                             
+                            <div class="t-head">
+                                <span class="t-tag"><?php echo htmlspecialchars($req['tag']); ?></span>
+                                <span class="t-prio p-<?php echo strtolower($req['priority']); ?>"><?php echo htmlspecialchars($req['priority']); ?></span>
+                            </div>
+                            
+                            <h4 class="t-title"><?php echo htmlspecialchars($req['asset_name']); ?></h4>
+                            <p class="t-desc"><?php echo htmlspecialchars($req['description']); ?></p>
+                            
+                            <div class="t-meta-row">
+                                <i class="bi bi-person"></i> Reporter: <?php echo htmlspecialchars($req['reporter_name']); ?>
+                            </div>
+                            <?php if ($req['assigned_technician']): ?>
+                            <div class="t-meta-row">
+                                <i class="bi bi-wrench"></i> Technician: <?php echo htmlspecialchars($req['assigned_technician']); ?>
+                            </div>
+                            <?php endif; ?>
+                            <div class="t-meta-row">
+                                <i class="bi bi-calendar"></i> Created: <?php echo date('d M Y', strtotime($req['created_at'])); ?>
+                            </div>
+                            
+                            <?php if (!empty($req['notes'])): ?>
+                            <div class="t-notes">Notes: <?php echo htmlspecialchars($req['notes']); ?></div>
+                            <?php endif; ?>
+                            
+                            <div class="t-actions">
+                                <?php if ($req['status'] === 'Pending' && ($user_role === 'admin' || $user_role === 'asset_manager')): ?>
+                                    <button class="t-btn primary assign btn-approve-maint" data-id="<?php echo $req['id']; ?>">Approve</button>
+                                    <button class="t-btn view btn-reject-maint" data-id="<?php echo $req['id']; ?>" title="Reject"><i class="bi bi-x-lg"></i></button>
+                                <?php elseif ($req['status'] === 'Approved' && ($user_role === 'admin' || $user_role === 'asset_manager')): ?>
+                                    <button class="t-btn primary assign btn-update-maint" data-id="<?php echo $req['id']; ?>" data-status="Technician Assigned" data-tech="<?php echo htmlspecialchars($req['assigned_technician'] ?? ''); ?>" data-notes="<?php echo htmlspecialchars($req['notes'] ?? ''); ?>">Assign Technician</button>
+                                <?php elseif ($req['status'] === 'Technician Assigned' && ($user_role === 'admin' || $user_role === 'asset_manager')): ?>
+                                    <button class="t-btn primary start btn-update-maint" data-id="<?php echo $req['id']; ?>" data-status="In Progress" data-tech="<?php echo htmlspecialchars($req['assigned_technician'] ?? ''); ?>" data-notes="<?php echo htmlspecialchars($req['notes'] ?? ''); ?>">Start Work</button>
+                                <?php elseif ($req['status'] === 'In Progress' && ($user_role === 'admin' || $user_role === 'asset_manager')): ?>
+                                    <button class="t-btn primary resolve btn-update-maint" data-id="<?php echo $req['id']; ?>" data-status="Resolved" data-tech="<?php echo htmlspecialchars($req['assigned_technician'] ?? ''); ?>" data-notes="<?php echo htmlspecialchars($req['notes'] ?? ''); ?>">Resolve</button>
+                                <?php endif; ?>
+                                
+                                <button class="t-btn view" title="View details" onclick="alert('Asset: <?php echo htmlspecialchars($req['asset_name']); ?>\nTag: <?php echo htmlspecialchars($req['tag']); ?>\nDescription: <?php echo htmlspecialchars($req['description']); ?>')"><i class="bi bi-eye"></i></button>
+                            </div>
+                            
+                        </div>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </div>
             </div>
-        <?php endforeach; ?>
+            <?php endforeach; ?>
+            
+        </div>
     </div>
-</section>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const searchInput = document.getElementById('filter-search');
+    const prioFilter = document.getElementById('filter-prio');
+    const assetFilter = document.getElementById('filter-asset');
+    const techFilter = document.getElementById('filter-tech');
+    const clearBtn = document.getElementById('btn-clear-filters');
+    const showingText = document.getElementById('showing-text');
+    
+    const allCards = document.querySelectorAll('.t-card');
+    const totalCount = allCards.length;
+
+    function applyFilters() {
+        const query = searchInput.value.toLowerCase();
+        const prio = prioFilter.value;
+        const asset = assetFilter.value;
+        const tech = techFilter.value;
+        
+        let visibleCount = 0;
+        
+        allCards.forEach(card => {
+            let match = true;
+            
+            if (query && !card.dataset.search.includes(query)) match = false;
+            if (prio && card.dataset.prio !== prio) match = false;
+            if (asset && card.dataset.asset !== asset) match = false;
+            if (tech && card.dataset.tech !== tech) match = false;
+            
+            if (match) {
+                card.style.display = 'block';
+                visibleCount++;
+            } else {
+                card.style.display = 'none';
+            }
+        });
+        
+        showingText.textContent = `Showing ${visibleCount} of ${totalCount} tickets`;
+        
+        // Update column counts
+        document.querySelectorAll('.kb-col').forEach(col => {
+            const visibleInCol = col.querySelectorAll('.t-card[style="display: block;"]').length;
+            const badge = col.querySelector('.count-badge');
+            if (badge) {
+                const totalInCol = col.querySelectorAll('.t-card').length;
+                if(totalInCol > 0) {
+                    badge.textContent = visibleInCol;
+                }
+            }
+        });
+    }
+
+    if(searchInput) searchInput.addEventListener('input', applyFilters);
+    if(prioFilter) prioFilter.addEventListener('change', applyFilters);
+    if(assetFilter) assetFilter.addEventListener('change', applyFilters);
+    if(techFilter) techFilter.addEventListener('change', applyFilters);
+    
+    if(clearBtn) {
+        clearBtn.addEventListener('click', () => {
+            searchInput.value = '';
+            prioFilter.value = '';
+            assetFilter.value = '';
+            techFilter.value = '';
+            applyFilters();
+        });
+    }
+});
+</script>
 
 <?php require_once 'footer.php'; ?>

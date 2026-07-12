@@ -65,7 +65,10 @@ $employees = $db->query("
                                     <td><span class="status-pill <?php echo $dept['status'] === 'Active' ? 'status-available' : 'status-retired'; ?>"><?php echo $dept['status']; ?></span></td>
                                     <?php if ($user_role === 'admin'): ?>
                                         <td>
-                                            <a href="edit_dept.php?id=<?php echo $dept['id']; ?>" class="btn btn-secondary btn-sm">Edit</a>
+                                            <div style="display: flex; gap: 8px;">
+                                                <a href="edit_dept.php?id=<?php echo $dept['id']; ?>" class="btn btn-secondary btn-sm">Edit</a>
+                                                <a href="delete_dept.php?id=<?php echo $dept['id']; ?>" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to delete this department?');">Delete</a>
+                                            </div>
                                         </td>
                                     <?php endif; ?>
                                 </tr>
@@ -120,7 +123,10 @@ $employees = $db->query("
                                     <td><?php echo $fieldsStr; ?></td>
                                     <?php if ($user_role === 'admin'): ?>
                                         <td>
-                                            <a href="edit_category.php?id=<?php echo $cat['id']; ?>" class="btn btn-secondary btn-sm">Edit</a>
+                                             <div style="display: flex; gap: 8px;">
+                                                <a href="edit_category.php?id=<?php echo $cat['id']; ?>" class="btn btn-secondary btn-sm">Edit</a>
+                                                <a href="delete_category.php?id=<?php echo $cat['id']; ?>" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to delete this category?');">Delete</a>
+                                            </div>
                                         </td>
                                     <?php endif; ?>
                                 </tr>
@@ -134,6 +140,9 @@ $employees = $db->query("
             <div id="tab-directory" class="tab-pane">
                 <div class="pane-header">
                     <h3>Employee Directory</h3>
+                    <?php if ($user_role === 'admin'): ?>
+                        <a href="create_employee.php" class="btn btn-primary btn-sm">Add Employee</a>
+                    <?php endif; ?>
                 </div>
                 <div class="table-responsive">
                     <table class="data-table">
@@ -150,7 +159,7 @@ $employees = $db->query("
                             </tr>
                         </thead>
                         <tbody>
-                            <?php foreach ($employees as $emp): ?>
+                             <?php foreach ($employees as $emp): ?>
                                 <tr>
                                     <td><strong><?php echo htmlspecialchars($emp['name']); ?></strong></td>
                                     <td><?php echo htmlspecialchars($emp['email']); ?></td>
@@ -159,7 +168,12 @@ $employees = $db->query("
                                     <td><span class="status-pill <?php echo $emp['status'] === 'Active' ? 'status-available' : 'status-retired'; ?>"><?php echo $emp['status']; ?></span></td>
                                     <?php if ($user_role === 'admin'): ?>
                                         <td>
-                                            <a href="edit_employee.php?id=<?php echo $emp['id']; ?>" class="btn btn-secondary btn-sm">Promote/Edit</a>
+                                             <div style="display: flex; gap: 8px;">
+                                                <a href="edit_employee.php?id=<?php echo $emp['id']; ?>" class="btn btn-secondary btn-sm">Promote/Edit</a>
+                                                <?php if ($emp['id'] !== $user_id): ?>
+                                                    <a href="delete_employee.php?id=<?php echo $emp['id']; ?>" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to delete this employee account?');">Delete</a>
+                                                <?php endif; ?>
+                                            </div>
                                         </td>
                                     <?php endif; ?>
                                 </tr>
